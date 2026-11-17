@@ -75,6 +75,12 @@ jobs:
       - name: Check migrations match the config
         run: npm run migrate:check
 
+      # Production runs with GCS on, which adds storage fields; the migrations must match that schema too.
+      - name: Check migrations match the config with GCS enabled
+        run: npm run migrate:check
+        env:
+          GCS_BUCKET: dummy
+
       - name: Run tests (test DB built from src/migrations)
         run: npm test
 

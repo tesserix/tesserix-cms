@@ -51,5 +51,13 @@ export const Media: CollectionConfig = {
         ],
       },
     },
+    {
+      // The GCS plugin adds this column only when enabled, so declare it here: the schema (and the
+      // migrations) must be the same with and without GCS_BUCKET. `alwaysInsertFields` would do it,
+      // but storage-gcs 3.93 returns before reading it when disabled. The plugin replaces this copy when on.
+      name: '_objectKey',
+      type: 'text',
+      admin: { disableBulkEdit: true, disableGroupBy: true, disableListColumn: true, disableListFilter: true, hidden: true, readOnly: true },
+    },
   ],
 }
