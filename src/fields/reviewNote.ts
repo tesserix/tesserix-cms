@@ -12,7 +12,12 @@ export const reviewNote: Field = {
   name: 'reviewNote',
   type: 'textarea',
   admin: { position: 'sidebar', description: 'Written by approvers. Editors can read it but not change it.' },
-  access: { create: ({ req }) => canApprove(req.user), update: ({ req }) => canApprove(req.user) },
+  access: {
+    // Staff feedback is not for the public site: signed-in users only.
+    read: ({ req }) => Boolean(req.user),
+    create: ({ req }) => canApprove(req.user),
+    update: ({ req }) => canApprove(req.user),
+  },
   hooks: {
     beforeValidate: [
       ({ value, previousValue, req }) => {

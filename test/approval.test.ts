@@ -276,6 +276,14 @@ describe('reviewNote', () => {
     })
     expect(edited.reviewNote).toBe('Fix the bio')
   })
+
+  test('anonymous never sees reviewNote', async () => {
+    await payload.update({ collection: 'doctors', id: publishedId, data: { reviewNote: 'Internal only' }, ...as(approverA) })
+    expect((await payload.findByID({ collection: 'doctors', id: publishedId, ...as(editorA) })).reviewNote).toBe('Internal only')
+    expect(await payload.findByID({ collection: 'doctors', id: publishedId, ...as(null) })).not.toHaveProperty('reviewNote')
+    const res = await rest('/doctors?depth=1')
+    for (const doc of ((await res.json()) as { docs: object[] }).docs) expect(doc).not.toHaveProperty('reviewNote')
+  })
 })
 
 describe('notifyApprovers', () => {
