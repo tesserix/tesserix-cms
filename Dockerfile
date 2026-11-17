@@ -62,7 +62,8 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
 # The Payload CLI and one-off scripts, which run from TypeScript sources via payload's tsx loader.
 # Standalone output does not include the CLI, so it gets its own production node_modules.
-# Jobs run e.g. `npm run migrate` with workingDir /app/cli (see README in the report).
+# Jobs (migrate, seed, create-super-admin) must set `workingDir: /app/cli` and need a writable /tmp
+# (tsx's cache): mount an emptyDir there if the root filesystem is read-only.
 WORKDIR /app/cli
 COPY --from=prod-deps --chown=nextjs:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=nextjs:nodejs /app/package.json /app/tsconfig.json ./

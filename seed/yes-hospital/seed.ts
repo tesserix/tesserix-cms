@@ -6,12 +6,15 @@ import * as data from './data'
 const photosDir = path.join(path.dirname(fileURLToPath(import.meta.url)), 'photos')
 
 /**
- * Loads YES Hospital's current site content into the CMS, all published. Idempotent: the tenant
- * is matched by slug, departments and doctors by slug, media by alt text (Payload may suffix a
- * filename that is taken), the rest by their natural key; matches are updated, never duplicated.
+ * Loads YES Hospital's current site content into the CMS, all published. It is a first-time
+ * bootstrap: if tenant `yes-hospital` already exists it logs and returns without touching
+ * anything, because a re-run would overwrite published edits and publish over pending drafts.
+ * With SEED_FORCE=true it re-runs anyway: the tenant, departments and doctors are matched by slug,
+ * media by alt text (Payload may suffix a filename that is taken), the rest by natural key, and
+ * every match is overwritten with the seed's content, published. Nothing is duplicated.
  * Runs as a trusted server call (`overrideAccess`) and never emails approvers or pings the site.
  */
-export async function seedYesHospital(payload: Payload): Promise<{ tenant: number }> {
+export async function seedYesHospital(payload: Payload): Promise<{ tenant: number; skipped: boolean }> {
   const opts = { overrideAccess: true, depth: 0, context: { skipNotifications: true } } as const
 
   const findOne = async (collection: CollectionSlug, where: Where) =>
@@ -21,6 +24,10 @@ export async function seedYesHospital(payload: Payload): Promise<{ tenant: numbe
   const env = { revalidateUrl: process.env.SEED_REVALIDATE_URL || undefined, webhookSecret: process.env.SEED_WEBHOOK_SECRET || undefined }
   const tenantData = { name: 'YES Hospital & Research Centre', slug: 'yes-hospital', siteUrl: 'https://yeshospital.in', ...env }
   const existing = await findOne('tenants', { slug: { equals: 'yes-hospital' } })
+  if (existing && process.env.SEED_FORCE !== 'true') {
+    payload.logger.info('seed:yes-hospital: tenant yes-hospital already exists; nothing changed. Set SEED_FORCE=true to overwrite its content with the seed (published).')
+    return { tenant: existing.id, skipped: true }
+  }
   const tenant = existing
     ? (await payload.update({ collection: 'tenants', id: existing.id, data: tenantData, ...opts })).id
     : (await payload.create({ collection: 'tenants', data: tenantData, ...opts })).id
@@ -63,5 +70,5 @@ export async function seedYesHospital(payload: Payload): Promise<{ tenant: numbe
   for (const name of data.tpas) await upsert('tpas', { name: { equals: name } }, { name })
   for (const s of data.schemes) await upsert('schemes', { name: { equals: s.name } }, s)
 
-  return { tenant: tenant as number }
+  return { tenant: tenant as number, skipped: false }
 }

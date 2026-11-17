@@ -1,10 +1,10 @@
 import type { CollectionSlug, Payload } from 'payload'
-import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest'
+import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest'
 import { notificationsSettled } from '../src/hooks/notifyApprovers'
 import * as data from '../seed/yes-hospital/data'
 import { legacyBlogSlugs, legacyServiceSlugs } from '../seed/yes-hospital/redirects'
 import { seedYesHospital } from '../seed/yes-hospital/seed'
-import { getTestPayload, resetDb } from './helpers'
+import { as, getTestPayload, mkUser, resetDb } from './helpers'
 
 let payload: Payload
 let tenant: number
@@ -30,7 +30,7 @@ beforeAll(async () => {
   expect(sendEmail).not.toHaveBeenCalled()
 }, 180_000)
 
-afterEach(() => {
+afterAll(() => {
   vi.unstubAllEnvs()
 })
 
@@ -75,10 +75,33 @@ describe('seed:yes-hospital', () => {
     expect(info).toMatchObject({ name: data.hospitalInfo.name, phones: data.hospitalInfo.phones })
   })
 
-  test('running it again changes no counts', async () => {
+  test('a second run without SEED_FORCE changes nothing: published edits and pending drafts survive', async () => {
+    vi.spyOn(payload, 'sendEmail').mockResolvedValue(undefined)
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('ok'))
+    const approver = await mkUser('approver@yes.test', 'approver', [tenant])
+    const editor = await mkUser('editor@yes.test', 'editor', [tenant])
+    const bySlug = async (slug: string) => (await payload.find({ collection: 'doctors', where: { slug: { equals: slug } }, overrideAccess: true })).docs[0]!
+    const edited = await bySlug(data.doctors[0]!.id)
+    const drafted = await bySlug(data.doctors[1]!.id)
+    await payload.update({ collection: 'doctors', id: edited.id, data: { qualification: 'Edited by approver', _status: 'published' }, ...as(approver) })
+    await payload.update({ collection: 'doctors', id: drafted.id, draft: true, data: { qualification: 'Pending draft' }, ...as(editor) })
+    await notificationsSettled()
+    const before = await counts()
+
+    vi.stubEnv('SEED_FORCE', '')
+    expect((await seedYesHospital(payload)).skipped).toBe(true)
+
+    expect(await counts()).toEqual(before)
+    expect((await payload.findByID({ collection: 'doctors', id: edited.id, overrideAccess: true })).qualification).toBe('Edited by approver')
+    const draft = await payload.findByID({ collection: 'doctors', id: drafted.id, draft: true, overrideAccess: true })
+    expect(draft).toMatchObject({ _status: 'draft', qualification: 'Pending draft' })
+  })
+
+  test('with SEED_FORCE=true it re-runs and changes no counts', async () => {
     const before = await counts()
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('ok'))
-    await seedYesHospital(payload)
+    vi.stubEnv('SEED_FORCE', 'true')
+    expect((await seedYesHospital(payload)).skipped).toBe(false)
     expect(await counts()).toEqual(before)
   }, 180_000)
 })

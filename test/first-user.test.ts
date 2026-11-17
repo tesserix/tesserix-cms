@@ -14,6 +14,13 @@ test('anonymous first-user registration on an empty DB is refused', async () => 
   expect((await payload.find({ collection: 'users' })).totalDocs).toBe(0)
 })
 
+test('anonymous POST /api/users on an empty DB is refused', async () => {
+  const payload = await getTestPayload()
+  const res = await rest('/users', undefined, { method: 'POST', body: { email: 'attacker@test.dev', password: 'x-password-123', role: 'super-admin' } })
+  expect(res.status).toBe(403)
+  expect((await payload.find({ collection: 'users' })).totalDocs).toBe(0)
+})
+
 test('createSuperAdmin creates one super-admin and is idempotent', async () => {
   const payload = await getTestPayload()
   await createSuperAdmin(payload, { email: 'Root@Test.dev', password: 'root-password-123' })

@@ -262,6 +262,7 @@ describe('notifyApprovers', () => {
   const settle = notificationsSettled
 
   test('an editor draft save emails the tenant approvers by bcc, once per hour per document', async () => {
+    vi.stubEnv('PAYLOAD_PUBLIC_SERVER_URL', 'https://cms.test') // independent of the developer's .env
     await mkUser('approver-a2@test.dev', 'approver', [tA])
     await payload.update({ collection: 'doctors', id: draftId, draft: true, data: { name: 'Dr Draft v2' }, ...as(editorA) })
     await sentCount(1)
@@ -272,12 +273,12 @@ describe('notifyApprovers', () => {
     expect(msg.text).toContain('Hospital A')
     expect(msg.text).toContain('Dr Draft v2')
     expect(msg.text).toContain('editor-a@test.dev')
-    expect(msg.text).toContain(`${process.env.PAYLOAD_PUBLIC_SERVER_URL}/admin/collections/doctors/${draftId}`)
-    expect(msg.text).toMatch(/Review: https?:\/\//)
+    expect(msg.text).toContain(`Review: https://cms.test/admin/collections/doctors/${draftId}`)
 
     // A different document gets its own email.
     await payload.update({ collection: 'doctors', id: publishedId, draft: true, data: { name: 'Dr Live v2' }, ...as(editorA) })
     await sentCount(2)
+    vi.unstubAllEnvs()
   })
 
   test('the hour window reopens, and approver saves do not notify', async () => {
@@ -335,6 +336,7 @@ describe('notifyApprovers', () => {
       await payload.update({ collection: 'doctors', id: draftId, draft: true, data: { name: 'v2' }, ...as(editorA) })
       await sentCount(1)
       expect(sent()[0]!.text).not.toContain('/admin/collections')
+      expect(sent()[0]!.text).not.toContain('Review:')
       expect(warn).toHaveBeenCalled()
     } finally {
       vi.unstubAllEnvs()
