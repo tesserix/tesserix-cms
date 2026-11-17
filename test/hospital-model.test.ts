@@ -108,6 +108,27 @@ describe('slug', () => {
     expect(updated.slug).toBe('renamed')
   })
 
+  test('renaming a published doc keeps its old slugs in previousSlugs, public and not writable', async () => {
+    const doc = await payload.create({ collection: 'doctors', data: { name: 'Dr Old', department: deptA, tenant: tA, _status: 'published' } })
+    expect(doc.previousSlugs ?? []).toEqual([])
+    const publish = (data: Record<string, unknown>) =>
+      payload.update({ collection: 'doctors', id: doc.id, data: { ...data, _status: 'published' }, ...as(approverA) })
+    await publish({ slug: 'dr-mid' })
+    // Input is ignored: previousSlugs is derived from the renames only.
+    await publish({ slug: 'dr-new', previousSlugs: ['hijack'] })
+    await publish({ name: 'Dr New' })
+    const anon = await payload.findByID({ collection: 'doctors', id: doc.id, overrideAccess: false, user: null })
+    expect(anon.previousSlugs).toEqual(['dr-old', 'dr-mid'])
+    // Renaming back to an old slug takes it out of the list: it is current again.
+    expect((await publish({ slug: 'dr-old' })).previousSlugs).toEqual(['dr-mid', 'dr-new'])
+  })
+
+  test('a never-published doc records no previous slugs', async () => {
+    const draft = await payload.create({ collection: 'doctors', draft: true, data: { name: 'Dr Draft', tenant: tA }, ...as(editorA) })
+    const doc = await payload.update({ collection: 'doctors', id: draft.id, draft: true, data: { slug: 'dr-draft-2' }, ...as(editorA) })
+    expect(doc.previousSlugs ?? []).toEqual([])
+  })
+
   test('a typed slug is normalised like a generated one', async () => {
     const doc = await payload.create({ collection: 'doctors', data: { name: 'Dr N', slug: 'Hello World/../x?y', department: deptA, tenant: tA } })
     expect(doc.slug).toBe('hello-world-x-y')

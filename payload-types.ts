@@ -268,6 +268,7 @@ export interface Department {
    */
   slug?: string | null;
   hasBeenPublished?: boolean | null;
+  previousSlugs?: string[] | null;
   shortName?: string | null;
   icon?:
     | ('Activity' | 'Baby' | 'Bone' | 'Brain' | 'Eye' | 'Heart' | 'Microscope' | 'Pill' | 'Stethoscope' | 'Syringe')
@@ -310,6 +311,7 @@ export interface Doctor {
    */
   slug?: string | null;
   hasBeenPublished?: boolean | null;
+  previousSlugs?: string[] | null;
   department: number | Department;
   qualification?: string | null;
   languages?: string[] | null;
@@ -669,6 +671,7 @@ export interface DepartmentsSelect<T extends boolean = true> {
   name?: T;
   slug?: T;
   hasBeenPublished?: T;
+  previousSlugs?: T;
   shortName?: T;
   icon?: T;
   description?: T;
@@ -699,6 +702,7 @@ export interface DoctorsSelect<T extends boolean = true> {
   name?: T;
   slug?: T;
   hasBeenPublished?: T;
+  previousSlugs?: T;
   department?: T;
   qualification?: T;
   languages?: T;

@@ -54,7 +54,9 @@ const checkSlug =
  * A URL slug, unique per tenant, generated from `useAsSlug` when left empty. Editors cannot change
  * it once the doc has ever been published; approvers can. Pair it with
  * `indexes: [{ fields: ['tenant', 'slug'], unique: true }]` for the database-level guarantee.
- * Returns two fields: the slug and the `hasBeenPublished` flag it reads.
+ * Returns three fields: the slug, the `hasBeenPublished` flag it reads, and `previousSlugs`, the
+ * slugs a published doc was renamed from, so the site can redirect its old URLs. A new slug may
+ * equal another doc's previous slug: the site matches current slugs first, so that redirect ends.
  */
 export const slugField = (useAsSlug = 'name'): Field[] => [
   {
@@ -78,6 +80,22 @@ export const slugField = (useAsSlug = 'name'): Field[] => [
       beforeChange: [
         ({ data, originalDoc, operation }) =>
           data?._status === 'published' || (operation === 'update' && Boolean(originalDoc?.hasBeenPublished)),
+      ],
+    },
+  },
+  {
+    // Derived, never taken from input. Public: the site reads it to redirect old URLs.
+    name: 'previousSlugs',
+    type: 'text',
+    hasMany: true,
+    admin: { hidden: true, readOnly: true },
+    hooks: {
+      beforeChange: [
+        ({ siblingData, originalDoc, operation }) => {
+          if (operation !== 'update') return []
+          const old: string[] = [...(originalDoc?.previousSlugs ?? []), ...(originalDoc?.hasBeenPublished && originalDoc.slug ? [originalDoc.slug] : [])]
+          return [...new Set(old)].filter((s) => s !== siblingData.slug)
+        },
       ],
     },
   },
