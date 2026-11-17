@@ -9,6 +9,7 @@ let tA: number
 let tB: number
 let editorA: User
 let editorB: User
+let approverA: User
 let jpeg1200: Buffer
 let big: Buffer
 
@@ -32,6 +33,7 @@ beforeEach(async () => {
   tA = await mkTenant('Hospital A', 'a')
   tB = await mkTenant('Hospital B', 'b')
   editorA = await mkUser('editor-a@test.dev', 'editor', [tA])
+  approverA = await mkUser('approver-a@test.dev', 'approver', [tA])
   editorB = await mkUser('editor-b@test.dev', 'editor', [tB])
 })
 
@@ -96,5 +98,44 @@ describe('media access', () => {
 
   test('an editor cannot upload into another tenant', async () => {
     await expect(mk(img(jpeg1200, 'x.jpg'), tB, editorA)).rejects.toThrow()
+  })
+})
+
+describe('media approval gate', () => {
+  test('a URL source upload is refused (it would bypass the size check)', async () => {
+    vi.spyOn(payload.logger, 'error').mockImplementation(() => undefined as never)
+    const body = { alt: 'x', tenant: tA, url: 'http://127.0.0.1:1/x.jpg', filename: 'x.jpg' }
+    await expect(payload.create({ collection: 'media', data: body as never })).rejects.toThrow(/URL|file/i)
+    const res = await rest('/media', editorA, { method: 'POST', body })
+    expect(res.status).toBeGreaterThanOrEqual(400)
+    expect((await payload.count({ collection: 'media' })).totalDocs).toBe(0)
+  })
+
+  test('an editor can create but not update or delete media; an approver can', async () => {
+    const doc = await mk(img(jpeg1200, 'live.jpg'), tA, editorA)
+    await expect(payload.update({ collection: 'media', id: doc.id, data: { alt: 'y' }, ...as(editorA) })).rejects.toThrow(/not allowed/i)
+    await expect(payload.delete({ collection: 'media', id: doc.id, ...as(editorA) })).rejects.toThrow(/not allowed/i)
+    expect((await rest(`/media/${doc.id}`, editorA, { method: 'DELETE' })).status).toBe(403)
+    const up = await payload.update({ collection: 'media', id: doc.id, data: { alt: 'y' }, ...as(approverA) })
+    expect(up.alt).toBe('y')
+    await payload.delete({ collection: 'media', id: doc.id, ...as(approverA) })
+  })
+
+  test('uploading an existing filename gets a new name and leaves the old file alone', async () => {
+    const first = await mk(img(jpeg1200, 'same.jpg'), tA, editorA)
+    const again = await payload.create({
+      collection: 'media',
+      data: { alt: 'x', tenant: tA },
+      file: { data: jpeg1200, mimetype: 'image/jpeg', name: first.filename!, size: jpeg1200.length },
+      ...as(editorA),
+    })
+    expect(again.filename).not.toBe(first.filename)
+    expect((await payload.findByID({ collection: 'media', id: first.id })).filename).toBe(first.filename)
+  })
+
+  test('an approver of A cannot touch B media', async () => {
+    const b = await mk(img(jpeg1200, 'b.jpg'), tB)
+    await expect(payload.update({ collection: 'media', id: b.id, data: { alt: 'y' }, ...as(approverA) })).rejects.toThrow()
+    await expect(payload.delete({ collection: 'media', id: b.id, ...as(approverA) })).rejects.toThrow()
   })
 })
