@@ -85,6 +85,15 @@ describe('media access', () => {
     const doc = await mk(img(jpeg1200, 'pub.jpg'), tB)
     expect((await payload.findByID({ collection: 'media', id: doc.id, ...as(null) })).id).toBe(doc.id)
     expect((await rest(`/media/file/${doc.filename}`)).status).toBe(200)
+    expect((await rest(`/media/${doc.id}`)).status).toBe(200)
+  })
+
+  test('anonymous cannot list media; signed-in users can', async () => {
+    await mk(img(jpeg1200, 'list.jpg'))
+    expect((await rest('/media')).status).toBe(403)
+    expect((await rest('/media?where[alt][equals]=x')).status).toBe(403)
+    expect((await rest('/media?where[id][exists]=true')).status).toBe(403)
+    expect((await rest('/media', editorA)).status).toBe(200)
   })
 
   test('logged-in users stay tenant-scoped, on the API and the file endpoint', async () => {
