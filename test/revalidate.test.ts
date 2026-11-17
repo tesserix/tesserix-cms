@@ -55,7 +55,13 @@ describe('publish webhook', () => {
     await notificationsSettled()
     fetchMock.mockClear()
     await mkDoctor({ name: 'Dr Draft', slug: 'dr-draft' , _status: 'draft' } as never)
+    const findByID = vi.spyOn(payload, 'findByID')
     await payload.update({ collection: 'doctors', id: live.id, draft: true, data: { name: 'edit' }, ...as(editorA) })
+    await payload.update({ collection: 'doctors', id: live.id, draft: true, data: { name: 'edit 2' }, ...as(approverA) })
+    await notificationsSettled()
+    // Nothing went live, so the webhook does not even poll for the commit.
+    // (notifyApprovers polls the draft for its email; the webhook would poll the live row.)
+    expect(findByID.mock.calls.filter(([a]) => a.collection === 'doctors' && !a.draft)).toEqual([])
     await notificationsSettled()
     expect(fetchMock).not.toHaveBeenCalled()
   })

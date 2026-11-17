@@ -43,10 +43,16 @@ const fire = ({ payload, collection, doc, previousSlug, deleted }: { payload: Pa
   )
 
 // `context: { skipNotifications: true }` (the seed) skips the webhook, like approver emails.
-export const revalidateOnChange: CollectionAfterChangeHook = ({ doc, previousDoc, collection, context, operation, req }) => {
+export const revalidateOnChange: CollectionAfterChangeHook = async ({ doc, previousDoc, collection, context, operation, req }) => {
   if (context.skipNotifications) return doc
   const wasLive = operation === 'update' && previousDoc?._status === 'published'
   if (doc._status !== 'published' && !(wasLive && doc._status === 'draft')) return doc
+  // A draft save of a published doc leaves the live row published; only an unpublish changes it.
+  // Read the row in this transaction (no poll) to tell the two apart.
+  if (doc._status === 'draft') {
+    const row = (await req.payload.db.findOne({ collection: collection.slug, where: { id: { equals: doc.id } }, req })) as Doc | null
+    if (row?._status !== 'draft') return doc
+  }
   const previousSlug = doc._status === 'published' && wasLive && previousDoc.slug && previousDoc.slug !== doc.slug ? previousDoc.slug : undefined
   fire({ payload: req.payload, collection: collection.slug, doc, previousSlug })
   return doc
