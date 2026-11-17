@@ -21,7 +21,8 @@ const fire = ({ payload, collection, doc, previousSlug, deleted }: { payload: Pa
         await sleep(COMMIT_POLL_MS)
         const latest = (await payload.findByID({ collection: collection as 'doctors', id: doc.id as number, depth: 0, disableErrors: true })) as Doc | null
         if (deleted ? !latest : latest && latest._status === doc._status && new Date(latest.updatedAt) >= new Date(doc.updatedAt)) break
-        if (i + 1 >= COMMIT_POLLS) return // rolled back or superseded: nothing went live from this save
+        // Rolled back, or superseded by a later save (which fires its own webhook): nothing went live from this one.
+        if (i + 1 >= COMMIT_POLLS) return payload.logger.debug(`revalidateSite: ${collection}/${doc.id} not committed; skipped`)
       }
       const tenantId = typeof doc.tenant === 'object' && doc.tenant ? (doc.tenant as { id: number }).id : (doc.tenant as number)
       const tenant = await payload.findByID({ collection: 'tenants', id: tenantId, depth: 0, overrideAccess: true })
@@ -33,12 +34,17 @@ const fire = ({ payload, collection, doc, previousSlug, deleted }: { payload: Pa
         headers: { 'content-type': 'application/json', 'x-cms-secret': tenant.webhookSecret ?? '' },
         body: JSON.stringify(body),
         signal: AbortSignal.timeout(timeout),
+        redirect: 'manual', // never forward the secret to wherever a redirect points; a 3xx is logged below
+      }).catch((err) => {
+        throw new Error(`revalidateSite: ${tenant.slug} ${collection} failed: ${String(err)}`)
       })
       if (!res.ok) payload.logger.error(`revalidateSite: ${tenant.slug} ${collection} responded ${res.status}`)
     })().catch((err) => payload.logger.error({ err: String(err), msg: `revalidateSite failed for ${collection}/${doc.id}` })),
   )
 
-export const revalidateOnChange: CollectionAfterChangeHook = ({ doc, previousDoc, collection, operation, req }) => {
+// `context: { skipNotifications: true }` (the seed) skips the webhook, like approver emails.
+export const revalidateOnChange: CollectionAfterChangeHook = ({ doc, previousDoc, collection, context, operation, req }) => {
+  if (context.skipNotifications) return doc
   const wasLive = operation === 'update' && previousDoc?._status === 'published'
   if (doc._status !== 'published' && !(wasLive && doc._status === 'draft')) return doc
   const previousSlug = doc._status === 'published' && wasLive && previousDoc.slug && previousDoc.slug !== doc.slug ? previousDoc.slug : undefined
@@ -46,7 +52,7 @@ export const revalidateOnChange: CollectionAfterChangeHook = ({ doc, previousDoc
   return doc
 }
 
-export const revalidateOnDelete: CollectionAfterDeleteHook = ({ doc, collection, req }) => {
-  if (doc._status === 'published') fire({ payload: req.payload, collection: collection.slug, doc, deleted: true })
+export const revalidateOnDelete: CollectionAfterDeleteHook = ({ doc, collection, context, req }) => {
+  if (!context.skipNotifications && doc._status === 'published') fire({ payload: req.payload, collection: collection.slug, doc, deleted: true })
   return doc
 }

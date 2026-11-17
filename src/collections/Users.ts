@@ -1,4 +1,4 @@
-import { Forbidden, ValidationError, type Access, type CollectionBeforeChangeHook, type CollectionConfig, type FieldAccess, type Where } from 'payload'
+import { Forbidden, ValidationError, type Access, type CollectionBeforeChangeHook, type CollectionBeforeOperationHook, type CollectionConfig, type FieldAccess, type Where } from 'payload'
 import { isApprover, isSuperAdmin, ROLES, userTenantIds } from '../access/roles'
 
 /**
@@ -63,6 +63,17 @@ const guardRolesAndTenants: CollectionBeforeChangeHook = ({ data, originalDoc, r
   return data
 }
 
+/**
+ * Payload's first-user registration (`POST /api/users/first-register`, behind the admin's
+ * create-first-user screen) creates with `overrideAccess: true`, so `access.create` never sees it:
+ * on an empty DB anyone could claim a super-admin. Only server-side (Local API) code may create a
+ * user without one signed in; the first super-admin comes from scripts/create-super-admin.ts.
+ */
+const noAnonymousCreate: CollectionBeforeOperationHook = ({ args, operation, req }) => {
+  if (operation === 'create' && !req.user && req.payloadAPI !== 'local') throw new Forbidden(req.t)
+  return args
+}
+
 export const Users: CollectionConfig = {
   slug: 'users',
   admin: { useAsTitle: 'email' },
@@ -74,7 +85,7 @@ export const Users: CollectionConfig = {
     delete: manageOthers,
     unlock: manageOthers,
   },
-  hooks: { beforeChange: [guardRolesAndTenants] },
+  hooks: { beforeOperation: [noAnonymousCreate], beforeChange: [guardRolesAndTenants] },
   fields: [
     { name: 'name', type: 'text' },
     {

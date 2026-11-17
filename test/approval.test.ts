@@ -304,7 +304,7 @@ describe('notifyApprovers', () => {
     expect(doc.name).toBe('v2')
     await sentCount(1)
     await vi.waitFor(async () => expect(await payload.kv.get(`approval-notified:doctors:${draftId}`)).toBeNull())
-    expect(logged).toHaveBeenCalledOnce()
+    expect(logged.mock.calls.filter((c) => JSON.stringify(c).includes('notifyApprovers'))).toHaveLength(1)
     await payload.update({ collection: 'doctors', id: draftId, draft: true, data: { name: 'v3' }, ...as(editorA) })
     await sentCount(2)
   })

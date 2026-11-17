@@ -17,10 +17,11 @@ type Args = Parameters<CollectionAfterChangeHook>[0]
  * first waits for the save to become visible on a separate connection (i.e. committed). A save
  * that rolls back never emails. Approvers are addressed by bcc so they do not see each other.
  * A failed email is logged, never fails the save, and releases the hour so the next save retries.
+ * Bulk server-side writes (the seed) pass `context: { skipNotifications: true }` to stay silent.
  */
-export const notifyApprovers: CollectionAfterChangeHook = async ({ doc, collection, req }) => {
+export const notifyApprovers: CollectionAfterChangeHook = async ({ doc, collection, context, req }) => {
   const { user, payload } = req
-  if (!user || canApprove(user) || doc._status !== 'draft') return doc
+  if (context.skipNotifications || !user || canApprove(user) || doc._status !== 'draft') return doc
   const key = `approval-notified:${collection.slug}:${doc.id}`
   try {
     // The KV adapter does not use the request's transaction, so this claim is visible at once.
@@ -65,8 +66,11 @@ async function sendWhenCommitted({
     // No `req`: outside the save's transaction, the new draft is only visible once committed.
     const latest = await payload.findByID({ collection: collection.slug, id: doc.id, draft: true, depth: 0, disableErrors: true })
     if (latest && new Date((latest as { updatedAt: string }).updatedAt) >= new Date(doc.updatedAt)) break
+    // Given up after COMMIT_POLLS: the save rolled back or never committed, so there is nothing to
+    // review. No email, and the hour is freed so the next real save notifies.
     if (i + 1 >= COMMIT_POLLS) {
-      await payload.kv.delete(key) // rolled back (or never committed): no email, and the hour is free again
+      payload.logger.debug(`notifyApprovers: ${collection.slug}/${doc.id} not committed; no email`)
+      await payload.kv.delete(key)
       return
     }
   }

@@ -25,6 +25,7 @@ beforeEach(async () => {
   editorA = await mkUser('editor-a@test.dev', 'editor', [tA])
   dept = await mkDepartment(tA, 'Cardiology')
   fetchMock = vi.mocked(fetch) as unknown as MockInstance<typeof fetch> // stubbed by test/setup.ts
+  fetchMock.mockResolvedValue(new Response('ok'))
   await notificationsSettled()
   fetchMock.mockClear()
   vi.spyOn(payload, 'sendEmail').mockResolvedValue(undefined)
@@ -45,6 +46,8 @@ describe('publish webhook', () => {
     expect(call!.init.method).toBe('POST')
     expect(call!.init.headers).toMatchObject({ 'x-cms-secret': 'secret-a', 'content-type': 'application/json' })
     expect(call!.body).toEqual({ collection: 'doctors', slug: 'dr-x' })
+    // A redirect is never followed, so the secret only ever goes to the configured URL.
+    expect(call!.init.redirect).toBe('manual')
   })
 
   test('draft saves post nothing, including drafts of a published doc', async () => {
@@ -103,7 +106,7 @@ describe('publish webhook', () => {
     await notificationsSettled()
     expect(logged).toHaveBeenCalledOnce()
     expect(JSON.stringify(logged.mock.calls)).not.toContain('secret-a')
-    expect(JSON.stringify(logged.mock.calls)).toContain('doctors')
+    expect(JSON.stringify(logged.mock.calls)).toContain('revalidateSite: a doctors')
 
     vi.stubEnv('REVALIDATE_TIMEOUT_MS', '50')
     fetchMock.mockImplementationOnce((_u: unknown, init?: RequestInit) => new Promise((_res, rej) => (init as RequestInit).signal!.addEventListener('abort', () => rej(new Error('aborted')))))
@@ -127,5 +130,19 @@ describe('publish webhook', () => {
     expect(fetchMock).not.toHaveBeenCalled()
     await commitTransaction(req)
     await vi.waitFor(() => expect(calls().map((c) => c.body.slug)).toEqual(['committed']))
+  })
+})
+
+describe('tenant revalidateUrl', () => {
+  const setUrl = (revalidateUrl: string) => payload.update({ collection: 'tenants', id: tA, data: { revalidateUrl } })
+
+  test('must be https, or http only for in-cluster service hosts', async () => {
+    await expect(setUrl('https://a.test/api/revalidate')).resolves.toBeTruthy()
+    await expect(setUrl('http://site.yes-hospital.svc.cluster.local:3000/api/revalidate')).resolves.toBeTruthy()
+    await expect(setUrl('')).resolves.toBeTruthy()
+    await expect(setUrl('http://a.test/api/revalidate')).rejects.toThrow(/revalidate URL/i)
+    await expect(setUrl('http://evil.test/x.svc.cluster.local')).rejects.toThrow(/revalidate URL/i)
+    await expect(setUrl('ftp://a.test/x')).rejects.toThrow(/revalidate URL/i)
+    await expect(setUrl('not a url')).rejects.toThrow(/revalidate URL/i)
   })
 })
