@@ -2,8 +2,9 @@ import { sql } from '@payloadcms/db-postgres/drizzle'
 import { getPayload, type Payload } from 'payload'
 import config from '../src/payload.config'
 
-// Fail loudly rather than falling back to the dev database.
-if (!process.env.DATABASE_URL_TEST) throw new Error('DATABASE_URL_TEST is not set')
+// Fail loudly before connecting (Payload pushes schema on connect) rather than touching a non-test database.
+const testDbName = new URL(process.env.DATABASE_URL_TEST || 'missing:').pathname.slice(1)
+if (!testDbName.endsWith('_test')) throw new Error(`DATABASE_URL_TEST must name a *_test database, got "${testDbName}"`)
 
 let cached: Promise<Payload> | undefined
 

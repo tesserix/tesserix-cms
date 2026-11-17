@@ -36,6 +36,16 @@ const mkUser = async (email: string, role: Role, tenants: number[] = []) =>
 // Local API calls made as a real user, with access control enforced.
 const as = (user: U | null) => ({ overrideAccess: false, user })
 
+// Payload's REST handler (what the Next API route calls), so no running server is needed.
+const rest = async (path: string, user?: U) => {
+  const headers: Record<string, string> = {}
+  if (user) {
+    const { token } = await payload.login({ collection: 'users', data: { email: user.email, password } })
+    headers.Authorization = `JWT ${token}`
+  }
+  return handleEndpoints({ config, request: new Request(`http://localhost/api${path}`, { headers }) })
+}
+
 beforeEach(async () => {
   await resetDb()
   payload = await getTestPayload()
@@ -101,20 +111,19 @@ describe('content isolation', () => {
   })
 
   test('REST: an editor of A listing doctors never sees B docs', async () => {
-    const { token } = await payload.login({ collection: 'users', data: { email: editorA.email, password } })
-    const rest = (path: string, auth = true) =>
-      handleEndpoints({
-        config,
-        request: new Request(`http://localhost/api${path}`, {
-          headers: auth ? { Authorization: `JWT ${token}` } : {},
-        }),
-      })
-    const list = await rest('/doctors')
+    const list = await rest('/doctors', editorA)
     expect(list.status).toBe(200)
     const body = (await list.json()) as { docs: { id: number }[] }
     expect(body.docs.map((d) => d.id)).toEqual([docA])
-    expect((await rest(`/doctors/${docB}`)).status).toBe(404)
-    expect((await rest('/doctors', false)).status).toBe(403)
+    expect((await rest(`/doctors/${docB}`, editorA)).status).toBe(404)
+    expect((await rest('/doctors')).status).toBe(403)
+  })
+
+  test('REST: B media files are not served to an editor of A or to anonymous', async () => {
+    const { filename } = await payload.findByID({ collection: 'media', id: mediaB })
+    expect((await rest(`/media/file/${filename}`, editorB)).status).toBe(200)
+    expect((await rest(`/media/file/${filename}`, editorA)).status).not.toBe(200)
+    expect((await rest(`/media/file/${filename}`)).status).not.toBe(200)
   })
 })
 
@@ -126,6 +135,14 @@ describe('tenants', () => {
     const asEditor = await payload.findByID({ collection: 'tenants', id: tA, ...as(editorA) })
     expect(asEditor).not.toHaveProperty('webhookSecret')
     const asRoot = await payload.findByID({ collection: 'tenants', id: tA, ...as(superAdmin) })
+    expect(asRoot.webhookSecret).toBe('secret-a')
+  })
+
+  test('REST: webhookSecret is only returned to a super-admin', async () => {
+    const asApprover = await (await rest(`/tenants/${tA}`, approverA)).json()
+    expect(asApprover.name).toBe('Hospital A')
+    expect(asApprover).not.toHaveProperty('webhookSecret')
+    const asRoot = await (await rest(`/tenants/${tA}`, superAdmin)).json()
     expect(asRoot.webhookSecret).toBe('secret-a')
   })
 
@@ -249,7 +266,57 @@ describe('users and privilege escalation', () => {
     await expect(
       payload.update({ collection: 'users', id: editorA.id, data: { tenants: [] }, ...as(superAdmin) }),
     ).rejects.toThrow()
-    expect(superAdmin.role).toBe('super-admin')
+    const root = await payload.create({ collection: 'users', data: newUser([], 'super-admin') })
+    expect(root.tenants).toEqual([])
+    const res = await payload.find({ collection: 'doctors', ...as(root) })
+    expect(res.docs.map((d) => d.id).sort()).toEqual([docA, docB].sort())
+  })
+
+  describe('a user shared by A and B', () => {
+    let shared: U
+    beforeEach(async () => {
+      shared = await mkUser('shared@test.dev', 'editor', [tA, tB])
+    })
+
+    test('an approver of A cannot change their password or email, delete, or demote them', async () => {
+      await expect(
+        payload.update({ collection: 'users', id: shared.id, data: { password: 'taken-over-123' }, ...as(approverA) }),
+      ).rejects.toThrow()
+      await expect(
+        payload.update({ collection: 'users', id: shared.id, data: { email: 'mine@test.dev' }, ...as(approverA) }),
+      ).rejects.toThrow()
+      await expect(payload.delete({ collection: 'users', id: shared.id, ...as(approverA) })).rejects.toThrow()
+      const approverAB = await mkUser('approver-ab@test.dev', 'approver', [tA, tB])
+      await expect(
+        payload.update({ collection: 'users', id: approverAB.id, data: { role: 'editor' }, ...as(approverA) }),
+      ).rejects.toThrow()
+      // Bulk writes by query are scoped the same way.
+      const bulk = await payload.update({
+        collection: 'users',
+        where: { email: { equals: 'shared@test.dev' } },
+        data: { name: 'bulk' },
+        ...as(approverA),
+      })
+      expect(bulk.docs).toHaveLength(0)
+      const after = await payload.findByID({ collection: 'users', id: shared.id })
+      expect(after.email).toBe('shared@test.dev')
+      expect(after.name).toBeFalsy()
+      expect((await payload.findByID({ collection: 'users', id: approverAB.id })).role).toBe('approver')
+      await payload.login({ collection: 'users', data: { email: 'shared@test.dev', password } })
+    })
+
+    test('an approver of A+B can manage them', async () => {
+      const approverAB = await mkUser('approver-ab@test.dev', 'approver', [tA, tB])
+      const u = await payload.update({
+        collection: 'users',
+        id: shared.id,
+        data: { email: 'shared2@test.dev', password: 'reset-pass-789', role: 'approver' },
+        ...as(approverAB),
+      })
+      expect(u.role).toBe('approver')
+      await payload.login({ collection: 'users', data: { email: 'shared2@test.dev', password: 'reset-pass-789' } })
+      await payload.delete({ collection: 'users', id: shared.id, ...as(approverAB) })
+    })
   })
 
   test('login is locked after 5 failed attempts', async () => {

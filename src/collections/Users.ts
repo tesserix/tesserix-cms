@@ -1,11 +1,32 @@
-import { Forbidden, ValidationError, type Access, type CollectionBeforeChangeHook, type CollectionConfig, type FieldAccess } from 'payload'
+import { Forbidden, ValidationError, type Access, type CollectionBeforeChangeHook, type CollectionConfig, type FieldAccess, type Where } from 'payload'
 import { isApprover, isSuperAdmin, ROLES, userTenantIds } from '../access/roles'
 
-// The multi-tenant plugin ANDs every result below with "own account, or shares one of my tenants".
-const manageOthers: Access = ({ req: { user } }) => {
+/**
+ * The multi-tenant plugin ANDs every result below with "own account, or shares one of my tenants".
+ * Sharing one tenant is not enough to manage someone: an approver of A who could reset the password
+ * of an A+B user could log in as them and reach B. So approvers only manage users whose tenants are
+ * all their own (and never super-admins).
+ */
+const manageOthers: Access = async ({ req }) => {
+  const { user } = req
   if (isSuperAdmin(user)) return true
-  if (isApprover(user)) return { role: { not_equals: 'super-admin' } }
-  return false
+  if (!user || !isApprover(user)) return false
+  // An array `not_in` matches users with at least one tenant outside mine.
+  const { docs } = await req.payload.find({
+    collection: 'users',
+    where: { 'tenants.tenant': { not_in: userTenantIds(user) } },
+    select: {},
+    depth: 0,
+    pagination: false,
+    req,
+  })
+  const scope: Where = {
+    or: [
+      { id: { equals: user.id } },
+      { and: [{ role: { not_equals: 'super-admin' } }, { id: { not_in: docs.map((d) => d.id) } }] },
+    ],
+  }
+  return scope
 }
 
 const canManageUsers: FieldAccess & Access = ({ req: { user } }) => isSuperAdmin(user) || isApprover(user)
