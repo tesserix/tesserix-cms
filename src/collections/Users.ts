@@ -77,7 +77,8 @@ const noAnonymousCreate: CollectionBeforeOperationHook = ({ args, operation, req
 export const Users: CollectionConfig = {
   slug: 'users',
   admin: { useAsTitle: 'email' },
-  auth: { maxLoginAttempts: 5, lockTime: 15 * 60 * 1000 },
+  // Secure only in production: local dev serves the admin over plain http.
+  auth: { maxLoginAttempts: 5, lockTime: 15 * 60 * 1000, cookies: { secure: process.env.NODE_ENV === 'production', sameSite: 'Lax' } },
   access: {
     create: canManageUsers,
     // Editors may only edit their own account; role and tenants are locked by field access below.
