@@ -1,5 +1,5 @@
-// Run with `npm run seed:yes-hospital` (`payload run`). First run only: if tenant yes-hospital exists it
-// changes nothing and exits 0. SEED_FORCE=true overwrites existing content with the seed, published.
+// Run with `npm run seed:yes-hospital` (`payload run`). First run only: once a run has finished it
+// changes nothing and exits 0; a run that failed part-way is resumed (missing docs only). SEED_FORCE=true overwrites existing content with the seed, published.
 // Optional env: SEED_REVALIDATE_URL, SEED_WEBHOOK_SECRET (the tenant's site webhook).
 import { getPayload } from 'payload'
 import { seedYesHospital } from '../seed/yes-hospital/seed'
