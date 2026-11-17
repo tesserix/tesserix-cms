@@ -2,7 +2,7 @@ import type { Payload } from 'payload'
 import { beforeEach, describe, expect, test } from 'vitest'
 import { getApproverEmails } from '../src/access/roles'
 import type { User } from '../payload-types'
-import { as, getTestPayload, mkTenant, mkUser, password, resetDb, rest } from './helpers'
+import { as, getTestPayload, mkDepartment, mkTenant, mkUser, password, resetDb, rest } from './helpers'
 
 type Role = User['role']
 type U = User
@@ -34,8 +34,8 @@ beforeEach(async () => {
   approverA = await mkUser('approver-a@test.dev', 'approver', [tA])
   editorA = await mkUser('editor-a@test.dev', 'editor', [tA])
   editorB = await mkUser('editor-b@test.dev', 'editor', [tB])
-  docA = (await payload.create({ collection: 'doctors', data: { name: 'Dr A', tenant: tA } })).id
-  docB = (await payload.create({ collection: 'doctors', data: { name: 'Dr B', tenant: tB } })).id
+  docA = (await payload.create({ collection: 'doctors', data: { name: 'Dr A', department: await mkDepartment(tA, 'Cardiology'), tenant: tA } })).id
+  docB = (await payload.create({ collection: 'doctors', data: { name: 'Dr B', department: await mkDepartment(tB, 'Cardiology'), tenant: tB } })).id
   await payload.create({ collection: 'media', data: { alt: 'A', tenant: tA }, file: file('a.png') })
   mediaB = (await payload.create({ collection: 'media', data: { alt: 'B', tenant: tB }, file: file('b.png') })).id
 })
@@ -56,7 +56,7 @@ describe('content isolation', () => {
     ).rejects.toThrow()
     await expect(payload.delete({ collection: 'doctors', id: docB, ...as(editorA) })).rejects.toThrow()
     await expect(
-      payload.create({ collection: 'doctors', data: { name: 'planted', tenant: tB }, ...as(editorA) }),
+      payload.create({ collection: 'doctors', draft: true, data: { name: 'planted', tenant: tB }, ...as(editorA) }),
     ).rejects.toThrow()
     // Moving an A doc into B is also a cross-tenant write.
     await expect(

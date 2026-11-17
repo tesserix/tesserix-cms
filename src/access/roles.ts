@@ -28,3 +28,15 @@ export async function getApproverEmails(payload: Payload, tenantId: string | num
 
 /** Approvers and super-admins may publish, unpublish, delete and write review notes. */
 export const canApprove = (user: MaybeUser): boolean => isSuperAdmin(user) || isApprover(user)
+
+/**
+ * `admin.hidden` for a client's collections: shown only to users of the tenant with this slug
+ * (and to super-admins). Reads the `tenantSlug` stored on each `tenants` row of the user, because
+ * `hidden` is synchronous and `req.user` is not populated.
+ */
+export const hiddenUnlessTenant =
+  (tenantSlug: string) =>
+  ({ user }: { user: unknown }): boolean => {
+    const u = user as MaybeUser & { tenants?: { tenantSlug?: string | null }[] | null }
+    return !isSuperAdmin(u) && !u?.tenants?.some((row) => row.tenantSlug === tenantSlug)
+  }

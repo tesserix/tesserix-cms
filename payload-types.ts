@@ -69,8 +69,16 @@ export interface Config {
   collections: {
     users: User;
     tenants: Tenant;
-    doctors: Doctor;
     media: Media;
+    'hospital-info': HospitalInfo;
+    departments: Department;
+    doctors: Doctor;
+    testimonials: Testimonial;
+    videos: Video;
+    faqs: Faq;
+    insurers: Insurer;
+    tpas: Tpa;
+    schemes: Scheme;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
@@ -80,8 +88,16 @@ export interface Config {
   collectionsSelect: {
     users: UsersSelect<false> | UsersSelect<true>;
     tenants: TenantsSelect<false> | TenantsSelect<true>;
-    doctors: DoctorsSelect<false> | DoctorsSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
+    'hospital-info': HospitalInfoSelect<false> | HospitalInfoSelect<true>;
+    departments: DepartmentsSelect<false> | DepartmentsSelect<true>;
+    doctors: DoctorsSelect<false> | DoctorsSelect<true>;
+    testimonials: TestimonialsSelect<false> | TestimonialsSelect<true>;
+    videos: VideosSelect<false> | VideosSelect<true>;
+    faqs: FaqsSelect<false> | FaqsSelect<true>;
+    insurers: InsurersSelect<false> | InsurersSelect<true>;
+    tpas: TpasSelect<false> | TpasSelect<true>;
+    schemes: SchemesSelect<false> | SchemesSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
@@ -132,6 +148,7 @@ export interface User {
   tenants?:
     | {
         tenant: number | Tenant;
+        tenantSlug?: string | null;
         id?: string | null;
       }[]
     | null;
@@ -174,22 +191,6 @@ export interface Tenant {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "doctors".
- */
-export interface Doctor {
-  id: number;
-  tenant?: (number | null) | Tenant;
-  name: string;
-  /**
-   * Written by approvers. Editors can read it but not change it.
-   */
-  reviewNote?: string | null;
-  updatedAt: string;
-  createdAt: string;
-  _status?: ('draft' | 'published') | null;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "media".
  */
 export interface Media {
@@ -207,6 +208,211 @@ export interface Media {
   height?: number | null;
   focalX?: number | null;
   focalY?: number | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "hospital-info".
+ */
+export interface HospitalInfo {
+  id: number;
+  tenant?: (number | null) | Tenant;
+  name: string;
+  tagline?: string | null;
+  address?: string | null;
+  phones?: string[] | null;
+  emergencyPhones?: string[] | null;
+  emails?: string[] | null;
+  about?: string | null;
+  mission?: string | null;
+  vision?: string | null;
+  values?: string[] | null;
+  facilities?: string[] | null;
+  /**
+   * Written by approvers. Editors can read it but not change it.
+   */
+  reviewNote?: string | null;
+  updatedAt: string;
+  createdAt: string;
+  _status?: ('draft' | 'published') | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "departments".
+ */
+export interface Department {
+  id: number;
+  tenant?: (number | null) | Tenant;
+  name: string;
+  /**
+   * Used in the page URL. Generated from the name if left empty.
+   */
+  slug?: string | null;
+  hasBeenPublished?: boolean | null;
+  shortName?: string | null;
+  icon?:
+    | ('Activity' | 'Baby' | 'Bone' | 'Brain' | 'Eye' | 'Heart' | 'Microscope' | 'Pill' | 'Stethoscope' | 'Syringe')
+    | null;
+  description: string;
+  blurb?: string | null;
+  symptoms: string[];
+  conditions?: string[] | null;
+  procedures?: string[] | null;
+  faqs?:
+    | {
+        q: string;
+        a: string;
+        id?: string | null;
+      }[]
+    | null;
+  featured?: boolean | null;
+  /**
+   * Lower comes first on the homepage.
+   */
+  featuredOrder?: number | null;
+  /**
+   * Written by approvers. Editors can read it but not change it.
+   */
+  reviewNote?: string | null;
+  updatedAt: string;
+  createdAt: string;
+  _status?: ('draft' | 'published') | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "doctors".
+ */
+export interface Doctor {
+  id: number;
+  tenant?: (number | null) | Tenant;
+  name: string;
+  /**
+   * Used in the page URL. Generated from the name if left empty.
+   */
+  slug?: string | null;
+  hasBeenPublished?: boolean | null;
+  department: number | Department;
+  qualification?: string | null;
+  languages?: string[] | null;
+  photo?: (number | null) | Media;
+  /**
+   * OPD timings, e.g. "Mon-Sat, 10am-2pm".
+   */
+  opd?: string | null;
+  active?: boolean | null;
+  /**
+   * Written by approvers. Editors can read it but not change it.
+   */
+  reviewNote?: string | null;
+  updatedAt: string;
+  createdAt: string;
+  _status?: ('draft' | 'published') | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "testimonials".
+ */
+export interface Testimonial {
+  id: number;
+  tenant?: (number | null) | Tenant;
+  name: string;
+  /**
+   * YouTube video ID.
+   */
+  videoId: string;
+  /**
+   * Caption shown under the video, e.g. "Recovery story (Hindi)".
+   */
+  language?: string | null;
+  /**
+   * Written by approvers. Editors can read it but not change it.
+   */
+  reviewNote?: string | null;
+  updatedAt: string;
+  createdAt: string;
+  _status?: ('draft' | 'published') | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "videos".
+ */
+export interface Video {
+  id: number;
+  tenant?: (number | null) | Tenant;
+  youtubeId: string;
+  title: string;
+  /**
+   * Written by approvers. Editors can read it but not change it.
+   */
+  reviewNote?: string | null;
+  updatedAt: string;
+  createdAt: string;
+  _status?: ('draft' | 'published') | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "faqs".
+ */
+export interface Faq {
+  id: number;
+  tenant?: (number | null) | Tenant;
+  question: string;
+  answer: string;
+  /**
+   * Written by approvers. Editors can read it but not change it.
+   */
+  reviewNote?: string | null;
+  updatedAt: string;
+  createdAt: string;
+  _status?: ('draft' | 'published') | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "insurers".
+ */
+export interface Insurer {
+  id: number;
+  tenant?: (number | null) | Tenant;
+  name: string;
+  /**
+   * Written by approvers. Editors can read it but not change it.
+   */
+  reviewNote?: string | null;
+  updatedAt: string;
+  createdAt: string;
+  _status?: ('draft' | 'published') | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "tpas".
+ */
+export interface Tpa {
+  id: number;
+  tenant?: (number | null) | Tenant;
+  name: string;
+  /**
+   * Written by approvers. Editors can read it but not change it.
+   */
+  reviewNote?: string | null;
+  updatedAt: string;
+  createdAt: string;
+  _status?: ('draft' | 'published') | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "schemes".
+ */
+export interface Scheme {
+  id: number;
+  tenant?: (number | null) | Tenant;
+  name: string;
+  description: string;
+  /**
+   * Written by approvers. Editors can read it but not change it.
+   */
+  reviewNote?: string | null;
+  updatedAt: string;
+  createdAt: string;
+  _status?: ('draft' | 'published') | null;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -241,12 +447,44 @@ export interface PayloadLockedDocument {
         value: number | Tenant;
       } | null)
     | ({
+        relationTo: 'media';
+        value: number | Media;
+      } | null)
+    | ({
+        relationTo: 'hospital-info';
+        value: number | HospitalInfo;
+      } | null)
+    | ({
+        relationTo: 'departments';
+        value: number | Department;
+      } | null)
+    | ({
         relationTo: 'doctors';
         value: number | Doctor;
       } | null)
     | ({
-        relationTo: 'media';
-        value: number | Media;
+        relationTo: 'testimonials';
+        value: number | Testimonial;
+      } | null)
+    | ({
+        relationTo: 'videos';
+        value: number | Video;
+      } | null)
+    | ({
+        relationTo: 'faqs';
+        value: number | Faq;
+      } | null)
+    | ({
+        relationTo: 'insurers';
+        value: number | Insurer;
+      } | null)
+    | ({
+        relationTo: 'tpas';
+        value: number | Tpa;
+      } | null)
+    | ({
+        relationTo: 'schemes';
+        value: number | Scheme;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -301,6 +539,7 @@ export interface UsersSelect<T extends boolean = true> {
     | T
     | {
         tenant?: T;
+        tenantSlug?: T;
         id?: T;
       };
   updatedAt?: T;
@@ -336,18 +575,6 @@ export interface TenantsSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "doctors_select".
- */
-export interface DoctorsSelect<T extends boolean = true> {
-  tenant?: T;
-  name?: T;
-  reviewNote?: T;
-  updatedAt?: T;
-  createdAt?: T;
-  _status?: T;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "media_select".
  */
 export interface MediaSelect<T extends boolean = true> {
@@ -364,6 +591,155 @@ export interface MediaSelect<T extends boolean = true> {
   height?: T;
   focalX?: T;
   focalY?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "hospital-info_select".
+ */
+export interface HospitalInfoSelect<T extends boolean = true> {
+  tenant?: T;
+  name?: T;
+  tagline?: T;
+  address?: T;
+  phones?: T;
+  emergencyPhones?: T;
+  emails?: T;
+  about?: T;
+  mission?: T;
+  vision?: T;
+  values?: T;
+  facilities?: T;
+  reviewNote?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  _status?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "departments_select".
+ */
+export interface DepartmentsSelect<T extends boolean = true> {
+  tenant?: T;
+  name?: T;
+  slug?: T;
+  hasBeenPublished?: T;
+  shortName?: T;
+  icon?: T;
+  description?: T;
+  blurb?: T;
+  symptoms?: T;
+  conditions?: T;
+  procedures?: T;
+  faqs?:
+    | T
+    | {
+        q?: T;
+        a?: T;
+        id?: T;
+      };
+  featured?: T;
+  featuredOrder?: T;
+  reviewNote?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  _status?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "doctors_select".
+ */
+export interface DoctorsSelect<T extends boolean = true> {
+  tenant?: T;
+  name?: T;
+  slug?: T;
+  hasBeenPublished?: T;
+  department?: T;
+  qualification?: T;
+  languages?: T;
+  photo?: T;
+  opd?: T;
+  active?: T;
+  reviewNote?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  _status?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "testimonials_select".
+ */
+export interface TestimonialsSelect<T extends boolean = true> {
+  tenant?: T;
+  name?: T;
+  videoId?: T;
+  language?: T;
+  reviewNote?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  _status?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "videos_select".
+ */
+export interface VideosSelect<T extends boolean = true> {
+  tenant?: T;
+  youtubeId?: T;
+  title?: T;
+  reviewNote?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  _status?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "faqs_select".
+ */
+export interface FaqsSelect<T extends boolean = true> {
+  tenant?: T;
+  question?: T;
+  answer?: T;
+  reviewNote?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  _status?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "insurers_select".
+ */
+export interface InsurersSelect<T extends boolean = true> {
+  tenant?: T;
+  name?: T;
+  reviewNote?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  _status?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "tpas_select".
+ */
+export interface TpasSelect<T extends boolean = true> {
+  tenant?: T;
+  name?: T;
+  reviewNote?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  _status?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "schemes_select".
+ */
+export interface SchemesSelect<T extends boolean = true> {
+  tenant?: T;
+  name?: T;
+  description?: T;
+  reviewNote?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  _status?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

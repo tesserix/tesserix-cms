@@ -37,7 +37,11 @@ const forceDrafts: CollectionBeforeOperationHook = ({ args, operation, overrideA
   if (!req.user) return operation === 'read' ? { ...args, draft: false } : args
   if (canApprove(req.user)) return args
   if ('data' in args && (args.data as { _status?: unknown } | undefined)?._status === 'published') throw new Forbidden(req.t)
-  if (operation === 'create' || operation === 'update') return { ...args, draft: true }
+  if (operation === 'create' || operation === 'update') {
+    // The locale publish flags write the latest (published) version row even on a draft save.
+    const { unpublishAllLocales, publishAllLocales, publishSpecificLocale, ...rest } = args as typeof args & Record<string, unknown>
+    return { ...rest, draft: true }
+  }
   // restoreVersion reads `draft` before this hook runs, so it can only be refused, not rewritten.
   if (operation === 'restoreVersion' && !args.draft) throw new Forbidden(req.t)
   return args

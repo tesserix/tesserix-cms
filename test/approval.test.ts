@@ -1,13 +1,15 @@
-import type { Payload } from 'payload'
+import { commitTransaction, createLocalReq, initTransaction, killTransaction, type Payload } from 'payload'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { User } from '../payload-types'
-import { as, getTestPayload, mkTenant, mkUser, resetDb, rest } from './helpers'
+import { notificationsSettled } from '../src/hooks/notifyApprovers'
+import { as, getTestPayload, mkDepartment, mkTenant, mkUser, resetDb, rest } from './helpers'
 
 let payload: Payload
 let tA: number
 let superAdmin: User
 let approverA: User
 let editorA: User
+let dept: number
 let draftId: number
 let publishedId: number
 
@@ -23,14 +25,19 @@ beforeEach(async () => {
   superAdmin = await mkUser('root@test.dev', 'super-admin')
   approverA = await mkUser('approver-a@test.dev', 'approver', [tA])
   editorA = await mkUser('editor-a@test.dev', 'editor', [tA])
-  draftId = (await payload.create({ collection: 'doctors', draft: true, data: { name: 'Dr Draft', tenant: tA } })).id
+  dept = await mkDepartment(tA, 'Cardiology')
+  draftId = (await payload.create({ collection: 'doctors', draft: true, data: { name: 'Dr Draft', department: dept, tenant: tA } })).id
   publishedId = (
-    await payload.create({ collection: 'doctors', data: { name: 'Dr Live', tenant: tA, _status: 'published' } })
+    await payload.create({ collection: 'doctors', data: { name: 'Dr Live', department: dept, tenant: tA, _status: 'published' } })
   ).id
   vi.spyOn(payload, 'sendEmail').mockResolvedValue(undefined)
 })
 
-afterEach(() => vi.restoreAllMocks())
+afterEach(async () => {
+  // Detached approver emails from this test must not land on the next test's spy.
+  await notificationsSettled()
+  vi.restoreAllMocks()
+})
 
 describe('drafts and the publish gate', () => {
   test('an editor saving a draft succeeds and leaves the published version live', async () => {
@@ -49,7 +56,7 @@ describe('drafts and the publish gate', () => {
   test('an editor write without draft: true still ends up as a draft', async () => {
     await payload.update({ collection: 'doctors', id: publishedId, data: { name: 'sneaky' }, ...as(editorA) })
     expect(await liveName(publishedId)).toBe('Dr Live')
-    const created = await payload.create({ collection: 'doctors', data: { name: 'Dr New', tenant: tA }, ...as(editorA) })
+    const created = await payload.create({ collection: 'doctors', data: { name: 'Dr New', department: dept, tenant: tA }, ...as(editorA) })
     expect(created._status).toBe('draft')
     expect(await publicNames()).toEqual(['Dr Live'])
   })
@@ -71,16 +78,69 @@ describe('drafts and the publish gate', () => {
 
   test('an editor create with _status published throws', async () => {
     await expect(
-      payload.create({ collection: 'doctors', data: { name: 'x', tenant: tA, _status: 'published' }, ...as(editorA) }),
+      payload.create({ collection: 'doctors', data: { name: 'x', department: dept, tenant: tA, _status: 'published' }, ...as(editorA) }),
     ).rejects.toThrow(/not allowed/i)
     expect(await publicNames()).toEqual(['Dr Live'])
   })
 
-  test('an editor cannot unpublish', async () => {
-    await payload
-      .update({ collection: 'doctors', id: publishedId, data: { _status: 'draft' }, ...as(editorA) })
-      .catch(() => undefined)
+  test('an editor cannot unpublish: _status draft only saves a draft', async () => {
+    const doc = await payload.update({ collection: 'doctors', id: publishedId, data: { _status: 'draft' }, ...as(editorA) })
+    expect(doc._status).toBe('draft')
     expect(await publicNames()).toEqual(['Dr Live'])
+    expect((await payload.findByID({ collection: 'doctors', id: publishedId }))._status).toBe('published')
+  })
+
+  test('REST: an editor PATCH with unpublishAllLocales leaves the live doc and its published version intact', async () => {
+    const res = await rest(`/doctors/${publishedId}?unpublishAllLocales=true`, editorA, {
+      method: 'PATCH',
+      body: { name: 'Dr Live (edited)' },
+    })
+    expect(res.status).toBe(200)
+    expect(await publicNames()).toEqual(['Dr Live'])
+    const live = await payload.findByID({ collection: 'doctors', id: publishedId })
+    expect(live).toMatchObject({ name: 'Dr Live', _status: 'published' })
+    const versions = await payload.findVersions({ collection: 'doctors', where: { parent: { equals: publishedId } } })
+    const published = versions.docs.filter((v) => v.version._status === 'published')
+    expect(published.map((v) => v.version.name)).toEqual(['Dr Live'])
+    await payload.update({ collection: 'doctors', id: publishedId, data: { name: 'Dr Live v3', _status: 'published' }, ...as(approverA) })
+    await payload.restoreVersion({ collection: 'doctors', id: published[0]!.id, ...as(approverA) })
+    expect(await publicNames()).toEqual(['Dr Live'])
+  })
+
+  test('an editor bulk update by where cannot publish or change the live row', async () => {
+    const where = { id: { in: [draftId, publishedId] } }
+    await expect(
+      payload.update({ collection: 'doctors', where, data: { _status: 'published' }, ...as(editorA) }),
+    ).rejects.toThrow(/not allowed/i)
+    const res = await payload.update({ collection: 'doctors', where, data: { opd: 'Sundays' }, ...as(editorA) })
+    expect(res.errors).toEqual([])
+    expect(res.docs.map((d) => d._status)).toEqual(['draft', 'draft'])
+    expect(await publicNames()).toEqual(['Dr Live'])
+    expect((await payload.findByID({ collection: 'doctors', id: publishedId })).opd).toBeFalsy()
+  })
+
+  test('an editor duplicating a published doc with a review note gets a draft', async () => {
+    await payload.update({ collection: 'doctors', id: publishedId, data: { reviewNote: 'Approved' }, ...as(approverA) })
+    const copy = await payload.duplicate({ collection: 'doctors', id: publishedId, ...as(editorA) })
+    expect(copy._status).toBe('draft')
+    expect(copy.reviewNote).toBeFalsy()
+    expect(copy.slug).toBe('dr-live-copy')
+    expect(await publicNames()).toEqual(['Dr Live'])
+    // An approver's copy does not carry the source's review either.
+    const copy2 = await payload.duplicate({ collection: 'doctors', id: publishedId, data: { slug: 'dr-live-2' }, ...as(approverA) })
+    expect(copy2.reviewNote).toBeFalsy()
+  })
+
+  test('an approver of tenant A cannot publish a tenant B doc', async () => {
+    const tB = await mkTenant('Hospital B', 'b')
+    const deptB = await mkDepartment(tB, 'Cardiology')
+    const docB = await payload.create({ collection: 'doctors', draft: true, data: { name: 'Dr B', department: deptB, tenant: tB } })
+    await expect(
+      payload.update({ collection: 'doctors', id: docB.id, data: { _status: 'published' }, ...as(approverA) }),
+    ).rejects.toThrow(/not allowed/i)
+    const res = await rest(`/doctors/${docB.id}`, approverA, { method: 'PATCH', body: { _status: 'published' } })
+    expect(res.status).toBe(403)
+    expect((await payload.findByID({ collection: 'doctors', id: docB.id }))._status).toBe('draft')
   })
 
   test('REST: an editor PATCH or POST with _status published is rejected', async () => {
@@ -90,8 +150,9 @@ describe('drafts and the publish gate', () => {
     expect(patchQ.status).toBe(403)
     const post = await rest('/doctors', editorA, { method: 'POST', body: { name: 'x', tenant: tA, _status: 'published' } })
     expect(post.status).toBe(403)
+    // An editor's _status draft is just a draft save; the live row stays published.
     const unpublish = await rest(`/doctors/${publishedId}`, editorA, { method: 'PATCH', body: { _status: 'draft' } })
-    expect(unpublish.status).toBeLessThan(500)
+    expect(unpublish.status).toBe(200)
     expect(await publicNames()).toEqual(['Dr Live'])
   })
 
@@ -111,6 +172,7 @@ describe('drafts and the publish gate', () => {
   test('an approver can unpublish', async () => {
     await payload.update({ collection: 'doctors', id: publishedId, data: { _status: 'draft' }, ...as(approverA) })
     expect(await publicNames()).toEqual([])
+    expect((await payload.findByID({ collection: 'doctors', id: publishedId }))._status).toBe('draft')
   })
 
   test('an editor cannot restore a version to published; an approver can', async () => {
@@ -127,7 +189,12 @@ describe('drafts and the publish gate', () => {
     // Restoring as a draft is just another draft save. (The Local API ignores `draft` here; REST honours it.)
     expect((await rest(`/doctors/versions/${draft.id}?draft=true`, editorA, { method: 'POST' })).status).toBe(200)
     expect(await publicNames()).toEqual(['Dr Live'])
+    // An approver restoring the old published version brings its content back live.
+    await payload.update({ collection: 'doctors', id: publishedId, data: { name: 'Dr Live v3', _status: 'published' }, ...as(approverA) })
+    expect(await publicNames()).toEqual(['Dr Live v3'])
     await payload.restoreVersion({ collection: 'doctors', id: live.id, ...as(approverA) })
+    expect(await publicNames()).toEqual(['Dr Live'])
+    expect(await liveName(publishedId)).toBe('Dr Live')
   })
 })
 
@@ -164,7 +231,7 @@ describe('reviewNote', () => {
       payload.update({ collection: 'doctors', id: draftId, draft: true, data: { reviewNote: 'lgtm' }, ...as(editorA) }),
     ).rejects.toThrow(/not allowed/i)
     await expect(
-      payload.create({ collection: 'doctors', data: { name: 'x', tenant: tA, reviewNote: 'self-approved' }, ...as(editorA) }),
+      payload.create({ collection: 'doctors', data: { name: 'x', department: dept, tenant: tA, reviewNote: 'self-approved' }, ...as(editorA) }),
     ).rejects.toThrow(/not allowed/i)
     const doc = await payload.update({ collection: 'doctors', id: draftId, draft: true, data: { reviewNote: 'Fix the bio' }, ...as(approverA) })
     expect(doc.reviewNote).toBe('Fix the bio')
@@ -181,41 +248,86 @@ describe('reviewNote', () => {
 })
 
 describe('notifyApprovers', () => {
-  test('an editor draft save emails the tenant approvers once per hour per document', async () => {
+  type Msg = { to: string; bcc: string[]; subject: string; text: string }
+  const sent = () => vi.mocked(payload.sendEmail).mock.calls.map((c) => c[0] as Msg)
+  const sentCount = (n: number) => vi.waitFor(() => expect(payload.sendEmail).toHaveBeenCalledTimes(n))
+  const settle = notificationsSettled
+
+  test('an editor draft save emails the tenant approvers by bcc, once per hour per document', async () => {
     await mkUser('approver-a2@test.dev', 'approver', [tA])
     await payload.update({ collection: 'doctors', id: draftId, draft: true, data: { name: 'Dr Draft v2' }, ...as(editorA) })
+    await sentCount(1)
     await payload.update({ collection: 'doctors', id: draftId, draft: true, data: { name: 'Dr Draft v3' }, ...as(editorA) })
-    expect(payload.sendEmail).toHaveBeenCalledTimes(1)
-    const msg = vi.mocked(payload.sendEmail).mock.calls[0]![0] as { to: string[]; subject: string; text: string }
-    expect([...msg.to].sort()).toEqual(['approver-a2@test.dev', 'approver-a@test.dev'])
+    const msg = sent()[0]!
+    expect(msg.to).toBe(payload.email.defaultFromAddress)
+    expect([...msg.bcc].sort()).toEqual(['approver-a2@test.dev', 'approver-a@test.dev'])
     expect(msg.text).toContain('Hospital A')
     expect(msg.text).toContain('Dr Draft v2')
     expect(msg.text).toContain('editor-a@test.dev')
-    expect(msg.text).toContain(`/admin/collections/doctors/${draftId}`)
+    expect(msg.text).toContain(`${process.env.PAYLOAD_PUBLIC_SERVER_URL}/admin/collections/doctors/${draftId}`)
+    expect(msg.text).toMatch(/Review: https?:\/\//)
 
     // A different document gets its own email.
     await payload.update({ collection: 'doctors', id: publishedId, draft: true, data: { name: 'Dr Live v2' }, ...as(editorA) })
-    expect(payload.sendEmail).toHaveBeenCalledTimes(2)
+    await sentCount(2)
   })
 
   test('the hour window reopens, and approver saves do not notify', async () => {
     vi.useFakeTimers({ toFake: ['Date'] })
     try {
       await payload.update({ collection: 'doctors', id: draftId, draft: true, data: { name: 'v2' }, ...as(editorA) })
+      await sentCount(1)
       vi.setSystemTime(Date.now() + 61 * 60 * 1000)
       await payload.update({ collection: 'doctors', id: draftId, draft: true, data: { name: 'v3' }, ...as(editorA) })
-      expect(payload.sendEmail).toHaveBeenCalledTimes(2)
+      await sentCount(2)
     } finally {
       vi.useRealTimers()
     }
     await payload.update({ collection: 'doctors', id: publishedId, draft: true, data: { name: 'x' }, ...as(approverA) })
     await payload.update({ collection: 'doctors', id: publishedId, draft: true, data: { name: 'y' }, ...as(superAdmin) })
+    await settle()
     expect(payload.sendEmail).toHaveBeenCalledTimes(2)
   })
 
-  test('a failing email never fails the save', async () => {
-    vi.mocked(payload.sendEmail).mockRejectedValue(new Error('resend down'))
+  test('a failing email never fails the save, and does not use up the hour', async () => {
+    vi.mocked(payload.sendEmail).mockRejectedValueOnce(new Error('resend down'))
     const doc = await payload.update({ collection: 'doctors', id: draftId, draft: true, data: { name: 'v2' }, ...as(editorA) })
     expect(doc.name).toBe('v2')
+    await sentCount(1)
+    await vi.waitFor(async () => expect(await payload.kv.get(`approval-notified:doctors:${draftId}`)).toBeNull())
+    await payload.update({ collection: 'doctors', id: draftId, draft: true, data: { name: 'v3' }, ...as(editorA) })
+    await sentCount(2)
+  })
+
+  test('sends only after the transaction commits', async () => {
+    const save = async (name: string) => {
+      const req = await createLocalReq({ user: editorA }, payload)
+      await initTransaction(req)
+      await payload.update({ collection: 'doctors', id: draftId, draft: true, data: { name }, req, overrideAccess: false, user: editorA })
+      return req
+    }
+    await killTransaction(await save('rolled back'))
+    await settle()
+    expect(payload.sendEmail).not.toHaveBeenCalled()
+
+    const req = await save('committed')
+    await new Promise((r) => setTimeout(r, 300))
+    expect(payload.sendEmail).not.toHaveBeenCalled()
+    await commitTransaction(req)
+    await sentCount(1)
+    expect(sent()[0]!.text).toContain('committed')
+  })
+
+  test('without an absolute server URL the link line is left out', async () => {
+    vi.stubEnv('PAYLOAD_PUBLIC_SERVER_URL', '')
+    const warn = vi.spyOn(payload.logger, 'warn')
+    try {
+      await payload.update({ collection: 'doctors', id: draftId, draft: true, data: { name: 'v2' }, ...as(editorA) })
+      await sentCount(1)
+      expect(sent()[0]!.text).not.toContain('/admin/collections')
+      expect(warn).toHaveBeenCalled()
+    } finally {
+      vi.unstubAllEnvs()
+    }
   })
 })

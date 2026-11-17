@@ -57,3 +57,12 @@ export const rest = async (path: string, user?: User, init: { method?: string; b
   const body = init.body === undefined ? undefined : JSON.stringify(init.body)
   return handleEndpoints({ config, request: new Request(`http://localhost/api${path}`, { method: init.method, headers, body }) })
 }
+
+/** A published department (doctors require one). */
+export const mkDepartment = async (tenant: number, name: string) =>
+  (
+    await (await getTestPayload()).create({
+      collection: 'departments',
+      data: { name, description: `${name} care`, symptoms: ['a', 'b', 'c'], tenant, _status: 'published' },
+    })
+  ).id

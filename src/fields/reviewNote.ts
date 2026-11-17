@@ -20,5 +20,7 @@ export const reviewNote: Field = {
         return value
       },
     ],
+    // A copy starts without the source's review.
+    beforeDuplicate: [() => null],
   },
 }
