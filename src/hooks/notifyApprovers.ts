@@ -2,10 +2,10 @@ import type { CollectionAfterChangeHook, Payload } from 'payload'
 import { canApprove, getApproverEmails } from '../access/roles'
 
 const HOUR = 60 * 60 * 1000
-const COMMIT_POLL_MS = 200
-const COMMIT_POLLS = 10
+export const COMMIT_POLL_MS = 200
+export const COMMIT_POLLS = 10
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 type Args = Parameters<CollectionAfterChangeHook>[0]
 
@@ -31,17 +31,22 @@ export const notifyApprovers: CollectionAfterChangeHook = async ({ doc, collecti
     payload.logger.error({ err, msg: `notifyApprovers failed for ${collection.slug}/${doc.id}` })
     return doc
   }
-  const task = sendWhenCommitted({ payload, collection, doc, user, key })
-    .catch(async (err) => {
+  detach(
+    sendWhenCommitted({ payload, collection, doc, user, key }).catch(async (err) => {
       payload.logger.error({ err, msg: `notifyApprovers failed for ${collection.slug}/${doc.id}` })
       await payload.kv.delete(key).catch(() => undefined)
-    })
-    .finally(() => pending.delete(task))
-  pending.add(task)
+    }),
+  )
   return doc
 }
 
 const pending = new Set<Promise<void>>()
+
+/** Tracks a detached task (it must handle its own errors) so `notificationsSettled` can wait for it. */
+export const detach = (task: Promise<void>) => {
+  const tracked = task.finally(() => pending.delete(tracked))
+  pending.add(tracked)
+}
 
 /** Resolves once every detached approver email has been sent or given up (for tests and shutdown). */
 export const notificationsSettled = async (): Promise<void> => {

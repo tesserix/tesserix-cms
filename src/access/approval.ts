@@ -1,6 +1,7 @@
 import { Forbidden, type CollectionBeforeChangeHook, type CollectionBeforeOperationHook, type CollectionConfig } from 'payload'
 import { reviewNote } from '../fields/reviewNote'
 import { notifyApprovers } from '../hooks/notifyApprovers'
+import { revalidateOnChange, revalidateOnDelete } from '../hooks/revalidateSite'
 import { canApprove } from './roles'
 
 /**
@@ -68,7 +69,8 @@ export const withApproval = (config: CollectionConfig): CollectionConfig => ({
     ...config.hooks,
     beforeOperation: [...(config.hooks?.beforeOperation ?? []), forceDrafts],
     beforeChange: [...(config.hooks?.beforeChange ?? []), publishGuard],
-    afterChange: [...(config.hooks?.afterChange ?? []), notifyApprovers],
+    afterChange: [...(config.hooks?.afterChange ?? []), notifyApprovers, revalidateOnChange],
+    afterDelete: [...(config.hooks?.afterDelete ?? []), revalidateOnDelete],
   },
   fields: [...config.fields, reviewNote],
 })
