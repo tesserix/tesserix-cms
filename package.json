@@ -12,7 +12,12 @@
     "start": "next start",
     "generate:importmap": "payload generate:importmap",
     "generate:types": "payload generate:types",
-    "test": "vitest run"
+    "test": "vitest run",
+    "migrate": "payload migrate",
+    "migrate:check": "payload migrate:create schema-drift --skip-empty && test -z \"$(git status --porcelain -- src/migrations)\" || (echo \"Schema changed without a migration: run npm run migrate:create <name> and commit it.\" && exit 1)",
+    "seed:yes-hospital": "payload run scripts/seed-yes-hospital.ts",
+    "create-super-admin": "payload run scripts/create-super-admin.ts",
+    "migrate:create": "payload migrate:create"
   },
   "dependencies": {
     "@payloadcms/db-postgres": "3.93.0",

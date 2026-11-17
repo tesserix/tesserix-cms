@@ -1,0 +1,12 @@
+.git
+.github
+.next
+.serena
+.env
+.env.*
+node_modules
+media
+test
+*.tsbuildinfo
+docker-compose.yml
+docker

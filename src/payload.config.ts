@@ -87,7 +87,8 @@ export default buildConfig({
         return requireEnv(isTest ? 'DATABASE_URL_TEST' : 'DATABASE_URL')
       },
     },
-    push: true, // shortcut: schema push until migrations land in Task 7
+    // Dev only: production and tests apply src/migrations (`npm run migrate`; test/globalSetup.ts).
+    push: process.env.NODE_ENV === 'development',
   }),
   plugins: [
     // Only with a bucket: tests and local dev keep files on disk. No credentials here: the Google

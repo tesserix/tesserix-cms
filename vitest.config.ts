@@ -7,6 +7,7 @@ export default defineConfig({
     include: ['test/**/*.test.ts'],
     testTimeout: 60_000,
     hookTimeout: 60_000,
+    globalSetup: ['test/globalSetup.ts'],
     setupFiles: ['test/setup.ts'],
     fileParallelism: false, // one shared test DB
   },
