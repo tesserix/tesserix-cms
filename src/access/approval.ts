@@ -1,4 +1,4 @@
-import { Forbidden, type CollectionBeforeChangeHook, type CollectionBeforeOperationHook, type CollectionConfig } from 'payload'
+import { Forbidden, type CollectionBeforeChangeHook, type CollectionBeforeOperationHook, type CollectionConfig, type Field } from 'payload'
 import { reviewNote } from '../fields/reviewNote'
 import { notifyApprovers } from '../hooks/notifyApprovers'
 import { revalidateOnChange, revalidateOnDelete } from '../hooks/revalidateSite'
@@ -53,9 +53,21 @@ const publishGuard: CollectionBeforeChangeHook = ({ req, data }) => {
   return data
 }
 
+/** Who made this save, draft or publish. Always overwritten, so clients cannot set it; server calls record nobody. */
+const recordUpdatedBy: CollectionBeforeChangeHook = ({ req, data }) => ({ ...data, updatedBy: req.user?.id ?? null })
+
+// Editor identities are not for the public site: signed-in users only.
+const updatedBy: Field = {
+  name: 'updatedBy',
+  type: 'relationship',
+  relationTo: 'users',
+  access: { read: ({ req }) => Boolean(req.user) },
+  admin: { position: 'sidebar', readOnly: true, description: 'Who saved this version.' },
+}
+
 /**
  * Applies the approval workflow to a content collection: drafts and versions, role access,
- * the publish guard, the review note, approver emails, and a status column in the list.
+ * the publish guard, the review note, who saved it (updatedBy), approver emails, and a status column in the list.
  */
 export const withApproval = (config: CollectionConfig): CollectionConfig => ({
   ...config,
@@ -68,9 +80,9 @@ export const withApproval = (config: CollectionConfig): CollectionConfig => ({
   hooks: {
     ...config.hooks,
     beforeOperation: [...(config.hooks?.beforeOperation ?? []), forceDrafts],
-    beforeChange: [...(config.hooks?.beforeChange ?? []), publishGuard],
+    beforeChange: [...(config.hooks?.beforeChange ?? []), publishGuard, recordUpdatedBy],
     afterChange: [...(config.hooks?.afterChange ?? []), notifyApprovers, revalidateOnChange],
     afterDelete: [...(config.hooks?.afterDelete ?? []), revalidateOnDelete],
   },
-  fields: [...config.fields, reviewNote],
+  fields: [...config.fields, reviewNote, updatedBy],
 })

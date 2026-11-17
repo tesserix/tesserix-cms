@@ -251,6 +251,10 @@ export interface HospitalInfo {
    * Written by approvers. Editors can read it but not change it.
    */
   reviewNote?: string | null;
+  /**
+   * Who saved this version.
+   */
+  updatedBy?: (number | null) | User;
   updatedAt: string;
   createdAt: string;
   _status?: ('draft' | 'published') | null;
@@ -294,6 +298,10 @@ export interface Department {
    * Written by approvers. Editors can read it but not change it.
    */
   reviewNote?: string | null;
+  /**
+   * Who saved this version.
+   */
+  updatedBy?: (number | null) | User;
   updatedAt: string;
   createdAt: string;
   _status?: ('draft' | 'published') | null;
@@ -325,6 +333,10 @@ export interface Doctor {
    * Written by approvers. Editors can read it but not change it.
    */
   reviewNote?: string | null;
+  /**
+   * Who saved this version.
+   */
+  updatedBy?: (number | null) | User;
   updatedAt: string;
   createdAt: string;
   _status?: ('draft' | 'published') | null;
@@ -349,6 +361,10 @@ export interface Testimonial {
    * Written by approvers. Editors can read it but not change it.
    */
   reviewNote?: string | null;
+  /**
+   * Who saved this version.
+   */
+  updatedBy?: (number | null) | User;
   updatedAt: string;
   createdAt: string;
   _status?: ('draft' | 'published') | null;
@@ -366,6 +382,10 @@ export interface Video {
    * Written by approvers. Editors can read it but not change it.
    */
   reviewNote?: string | null;
+  /**
+   * Who saved this version.
+   */
+  updatedBy?: (number | null) | User;
   updatedAt: string;
   createdAt: string;
   _status?: ('draft' | 'published') | null;
@@ -383,6 +403,10 @@ export interface Faq {
    * Written by approvers. Editors can read it but not change it.
    */
   reviewNote?: string | null;
+  /**
+   * Who saved this version.
+   */
+  updatedBy?: (number | null) | User;
   updatedAt: string;
   createdAt: string;
   _status?: ('draft' | 'published') | null;
@@ -399,6 +423,10 @@ export interface Insurer {
    * Written by approvers. Editors can read it but not change it.
    */
   reviewNote?: string | null;
+  /**
+   * Who saved this version.
+   */
+  updatedBy?: (number | null) | User;
   updatedAt: string;
   createdAt: string;
   _status?: ('draft' | 'published') | null;
@@ -415,6 +443,10 @@ export interface Tpa {
    * Written by approvers. Editors can read it but not change it.
    */
   reviewNote?: string | null;
+  /**
+   * Who saved this version.
+   */
+  updatedBy?: (number | null) | User;
   updatedAt: string;
   createdAt: string;
   _status?: ('draft' | 'published') | null;
@@ -432,6 +464,10 @@ export interface Scheme {
    * Written by approvers. Editors can read it but not change it.
    */
   reviewNote?: string | null;
+  /**
+   * Who saved this version.
+   */
+  updatedBy?: (number | null) | User;
   updatedAt: string;
   createdAt: string;
   _status?: ('draft' | 'published') | null;
@@ -658,6 +694,7 @@ export interface HospitalInfoSelect<T extends boolean = true> {
   values?: T;
   facilities?: T;
   reviewNote?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
   _status?: T;
@@ -689,6 +726,7 @@ export interface DepartmentsSelect<T extends boolean = true> {
   featured?: T;
   featuredOrder?: T;
   reviewNote?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
   _status?: T;
@@ -710,6 +748,7 @@ export interface DoctorsSelect<T extends boolean = true> {
   opd?: T;
   active?: T;
   reviewNote?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
   _status?: T;
@@ -724,6 +763,7 @@ export interface TestimonialsSelect<T extends boolean = true> {
   videoId?: T;
   language?: T;
   reviewNote?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
   _status?: T;
@@ -737,6 +777,7 @@ export interface VideosSelect<T extends boolean = true> {
   youtubeId?: T;
   title?: T;
   reviewNote?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
   _status?: T;
@@ -750,6 +791,7 @@ export interface FaqsSelect<T extends boolean = true> {
   question?: T;
   answer?: T;
   reviewNote?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
   _status?: T;
@@ -762,6 +804,7 @@ export interface InsurersSelect<T extends boolean = true> {
   tenant?: T;
   name?: T;
   reviewNote?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
   _status?: T;
@@ -774,6 +817,7 @@ export interface TpasSelect<T extends boolean = true> {
   tenant?: T;
   name?: T;
   reviewNote?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
   _status?: T;
@@ -787,6 +831,7 @@ export interface SchemesSelect<T extends boolean = true> {
   name?: T;
   description?: T;
   reviewNote?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
   _status?: T;

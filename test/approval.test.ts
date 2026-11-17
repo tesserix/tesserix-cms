@@ -233,6 +233,29 @@ describe('anonymous reads', () => {
   })
 })
 
+describe('updatedBy', () => {
+  const idOf = (v: unknown) => (typeof v === 'object' && v ? (v as { id: number }).id : v)
+
+  test('records who saved each draft and publish; clients cannot set it; anonymous never sees it', async () => {
+    // A trusted server call (the seed) records nobody.
+    expect(idOf((await payload.findByID({ collection: 'doctors', id: publishedId })).updatedBy) ?? null).toBeNull()
+
+    await payload.update({ collection: 'doctors', id: publishedId, draft: true, data: { name: 'Dr Edit', updatedBy: approverA.id }, ...as(editorA) })
+    const draft = await payload.findByID({ collection: 'doctors', id: publishedId, draft: true, depth: 0 })
+    expect(idOf(draft.updatedBy)).toBe(editorA.id)
+    const { docs } = await payload.findVersions({ collection: 'doctors', where: { parent: { equals: publishedId } }, sort: '-updatedAt', limit: 1, depth: 0 })
+    expect(idOf(docs[0]!.version.updatedBy)).toBe(editorA.id)
+
+    await payload.update({ collection: 'doctors', id: publishedId, data: { _status: 'published', updatedBy: editorA.id }, ...as(approverA) })
+    expect(idOf((await payload.findByID({ collection: 'doctors', id: publishedId, depth: 0 })).updatedBy)).toBe(approverA.id)
+
+    const anon = await payload.findByID({ collection: 'doctors', id: publishedId, ...as(null) })
+    expect(anon).not.toHaveProperty('updatedBy')
+    const res = await rest('/doctors?depth=1')
+    expect(((await res.json()) as { docs: object[] }).docs[0]).not.toHaveProperty('updatedBy')
+  })
+})
+
 describe('reviewNote', () => {
   test('an editor updating reviewNote throws; an approver can set it', async () => {
     await expect(
