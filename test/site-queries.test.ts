@@ -2,13 +2,12 @@ import type { Payload } from 'payload'
 import { beforeAll, describe, expect, test, vi } from 'vitest'
 import * as data from '../seed/yes-hospital/data'
 import { seedYesHospital } from '../seed/yes-hospital/seed'
+import { SITE_COLLECTIONS, siteQuery } from '../scripts/lib/siteQueries'
 import { notificationsSettled } from '../src/hooks/notifyApprovers'
 import { getTestPayload, resetDb, rest } from './helpers'
 
-/** Exactly what yes-hospital/src/lib/cms.ts requests, anonymously, for each collection it reads. */
-export const siteQuery = (collection: string) => `/${collection}?where[tenant.slug][equals]=yes-hospital&depth=1&limit=0&sort=createdAt`
-
-const expected: Record<string, number> = {
+// siteQuery: exactly what yes-hospital/src/lib/cms.ts requests, anonymously, for each collection it reads.
+const expected: Record<(typeof SITE_COLLECTIONS)[number], number> = {
   'hospital-info': 1,
   departments: data.departments.length,
   doctors: 36,
