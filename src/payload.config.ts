@@ -1,4 +1,5 @@
 import { postgresAdapter } from '@payloadcms/db-postgres'
+import { resendAdapter } from '@payloadcms/email-resend'
 import { multiTenantPlugin } from '@payloadcms/plugin-multi-tenant'
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
 import { buildConfig } from 'payload'
@@ -22,6 +23,14 @@ export default buildConfig({
   admin: { user: Users.slug },
   collections: [Users, Tenants, Doctors, Media],
   editor: lexicalEditor(),
+  // Without a key (tests, local, build) Payload logs emails to the console instead.
+  email: process.env.RESEND_API_KEY
+    ? resendAdapter({
+        apiKey: process.env.RESEND_API_KEY,
+        defaultFromAddress: process.env.EMAIL_FROM || 'cms@tesserix.app',
+        defaultFromName: 'Tesserix CMS',
+      })
+    : undefined,
   // Getters defer env checks to Payload init / DB connect, so `next build` works without them.
   get secret() {
     return requireEnv('PAYLOAD_SECRET')

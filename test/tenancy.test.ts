@@ -1,9 +1,8 @@
-import { handleEndpoints, type Payload } from 'payload'
+import type { Payload } from 'payload'
 import { beforeEach, describe, expect, test } from 'vitest'
-import config from '../src/payload.config'
 import { getApproverEmails } from '../src/access/roles'
 import type { User } from '../payload-types'
-import { getTestPayload, resetDb } from './helpers'
+import { as, getTestPayload, mkTenant, mkUser, password, resetDb, rest } from './helpers'
 
 type Role = User['role']
 type U = User
@@ -19,7 +18,6 @@ let docA: number
 let docB: number
 let mediaB: number
 
-const password = 'test-password-123'
 // A 1x1 transparent PNG.
 const png = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
@@ -27,35 +25,9 @@ const png = Buffer.from(
 )
 const file = (name: string) => ({ data: png, mimetype: 'image/png', name, size: png.length })
 
-const mkUser = async (email: string, role: Role, tenants: number[] = []) =>
-  payload.create({
-    collection: 'users',
-    data: { email, password, role, tenants: tenants.map((tenant) => ({ tenant })) },
-  })
-
-// Local API calls made as a real user, with access control enforced.
-const as = (user: U | null) => ({ overrideAccess: false, user })
-
-// Payload's REST handler (what the Next API route calls), so no running server is needed.
-const rest = async (path: string, user?: U) => {
-  const headers: Record<string, string> = {}
-  if (user) {
-    const { token } = await payload.login({ collection: 'users', data: { email: user.email, password } })
-    headers.Authorization = `JWT ${token}`
-  }
-  return handleEndpoints({ config, request: new Request(`http://localhost/api${path}`, { headers }) })
-}
-
 beforeEach(async () => {
   await resetDb()
   payload = await getTestPayload()
-  const mkTenant = async (name: string, slug: string) =>
-    (
-      await payload.create({
-        collection: 'tenants',
-        data: { name, slug, siteUrl: `https://${slug}.test`, revalidateUrl: `https://${slug}.test/api/revalidate`, webhookSecret: `secret-${slug}` },
-      })
-    ).id
   tA = await mkTenant('Hospital A', 'a')
   tB = await mkTenant('Hospital B', 'b')
   superAdmin = await mkUser('root@test.dev', 'super-admin')
@@ -101,8 +73,9 @@ describe('content isolation', () => {
     await expect(payload.findByID({ collection: 'media', id: mediaB, ...as(editorA) })).rejects.toThrow()
   })
 
-  test('anonymous cannot read doctors', async () => {
-    await expect(payload.find({ collection: 'doctors', ...as(null) })).rejects.toThrow()
+  test('anonymous reads no unpublished doctors', async () => {
+    // Anonymous may read published content only (see test/approval.test.ts); these are drafts.
+    expect((await payload.find({ collection: 'doctors', ...as(null) })).docs).toEqual([])
   })
 
   test('a super-admin sees every tenant', async () => {
@@ -116,7 +89,7 @@ describe('content isolation', () => {
     const body = (await list.json()) as { docs: { id: number }[] }
     expect(body.docs.map((d) => d.id)).toEqual([docA])
     expect((await rest(`/doctors/${docB}`, editorA)).status).toBe(404)
-    expect((await rest('/doctors')).status).toBe(403)
+    expect(((await (await rest('/doctors')).json()) as { docs: unknown[] }).docs).toEqual([])
   })
 
   test('REST: B media files are not served to an editor of A or to anonymous', async () => {

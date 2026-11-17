@@ -180,8 +180,13 @@ export interface Doctor {
   id: number;
   tenant?: (number | null) | Tenant;
   name: string;
+  /**
+   * Written by approvers. Editors can read it but not change it.
+   */
+  reviewNote?: string | null;
   updatedAt: string;
   createdAt: string;
+  _status?: ('draft' | 'published') | null;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -336,8 +341,10 @@ export interface TenantsSelect<T extends boolean = true> {
 export interface DoctorsSelect<T extends boolean = true> {
   tenant?: T;
   name?: T;
+  reviewNote?: T;
   updatedAt?: T;
   createdAt?: T;
+  _status?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

@@ -25,3 +25,6 @@ export async function getApproverEmails(payload: Payload, tenantId: string | num
   })
   return docs.map((u) => u.email)
 }
+
+/** Approvers and super-admins may publish, unpublish, delete and write review notes. */
+export const canApprove = (user: MaybeUser): boolean => isSuperAdmin(user) || isApprover(user)

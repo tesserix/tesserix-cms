@@ -1,5 +1,6 @@
 import { sql } from '@payloadcms/db-postgres/drizzle'
-import { getPayload, type Payload } from 'payload'
+import { getPayload, handleEndpoints, type Payload } from 'payload'
+import type { User } from '../payload-types'
 import config from '../src/payload.config'
 
 // Fail loudly before connecting (Payload pushes schema on connect) rather than touching a non-test database.
@@ -22,4 +23,37 @@ export async function resetDb(): Promise<void> {
   if (!rows.length) return
   const list = rows.map((r) => `"${r.tablename}"`).join(', ')
   await drizzle.execute(sql.raw(`TRUNCATE ${list} RESTART IDENTITY CASCADE`))
+}
+
+// Shared fixtures for tests that act as real users.
+
+export const password = 'test-password-123'
+
+/** Local API options for a call made as a real user, with access control enforced. */
+export const as = (user: User | null) => ({ overrideAccess: false, user })
+
+export const mkUser = async (email: string, role: User['role'], tenants: number[] = []) =>
+  (await getTestPayload()).create({
+    collection: 'users',
+    data: { email, password, role, tenants: tenants.map((tenant) => ({ tenant })) },
+  })
+
+export const mkTenant = async (name: string, slug: string) =>
+  (
+    await (await getTestPayload()).create({
+      collection: 'tenants',
+      data: { name, slug, siteUrl: `https://${slug}.test`, revalidateUrl: `https://${slug}.test/api/revalidate`, webhookSecret: `secret-${slug}` },
+    })
+  ).id
+
+/** Payload's REST handler (what the Next API route calls), so no running server is needed. */
+export const rest = async (path: string, user?: User, init: { method?: string; body?: unknown } = {}) => {
+  const headers: Record<string, string> = {}
+  if (user) {
+    const { token } = await (await getTestPayload()).login({ collection: 'users', data: { email: user.email, password } })
+    headers.Authorization = `JWT ${token}`
+  }
+  if (init.body !== undefined) headers['Content-Type'] = 'application/json'
+  const body = init.body === undefined ? undefined : JSON.stringify(init.body)
+  return handleEndpoints({ config, request: new Request(`http://localhost/api${path}`, { method: init.method, headers, body }) })
 }
