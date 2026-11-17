@@ -1,7 +1,8 @@
 import type { Payload } from 'payload'
-import { beforeEach, describe, expect, test } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { User } from '../payload-types'
 import { hiddenUnlessTenant } from '../src/access/roles'
+import { notificationsSettled } from '../src/hooks/notifyApprovers'
 import { as, getTestPayload, mkDepartment, mkTenant, mkUser, resetDb } from './helpers'
 
 let payload: Payload
@@ -21,6 +22,15 @@ beforeEach(async () => {
   approverA = await mkUser('approver-a@test.dev', 'approver', [tA])
   editorA = await mkUser('editor-a@test.dev', 'editor', [tA])
   deptA = await mkDepartment(tA, 'Cardiology')
+  // Publishing as a non-approver emails approvers; keep that off the console. Forbidden/validation errors are
+  // expected here and logged at INFO, so silence only that level.
+  vi.spyOn(payload, 'sendEmail').mockResolvedValue(undefined)
+  vi.spyOn(payload.logger, 'info').mockImplementation(() => undefined as never)
+})
+
+afterEach(async () => {
+  await notificationsSettled()
+  vi.restoreAllMocks()
 })
 
 describe('departments', () => {
@@ -98,6 +108,13 @@ describe('slug', () => {
     expect(updated.slug).toBe('renamed')
   })
 
+  test('a typed slug is normalised like a generated one', async () => {
+    const doc = await payload.create({ collection: 'doctors', data: { name: 'Dr N', slug: 'Hello World/../x?y', department: deptA, tenant: tA } })
+    expect(doc.slug).toBe('hello-world-x-y')
+    const upd = await payload.update({ collection: 'doctors', id: doc.id, data: { slug: '--A_B--' } })
+    expect(upd.slug).toBe('a-b')
+  })
+
   test('an editor may change the slug of a never-published draft', async () => {
     const draft = await payload.create({ collection: 'doctors', draft: true, data: { name: 'Dr New', tenant: tA }, ...as(editorA) })
     const doc = await payload.update({ collection: 'doctors', id: draft.id, draft: true, data: { slug: 'dr-new-2' }, ...as(editorA) })
@@ -127,6 +144,25 @@ describe('doctors', () => {
         ...as(approverA),
       }),
     ).rejects.toThrow()
+  })
+})
+
+describe('doctor department', () => {
+  test('publishing requires a published department; drafts do not', async () => {
+    const draftDept = (
+      await payload.create({
+        collection: 'departments',
+        draft: true,
+        data: { name: 'Draft Dept', description: 'd', symptoms, tenant: tA },
+      })
+    ).id
+    const data = { name: 'Dr P', department: draftDept, tenant: tA }
+    await expect(payload.create({ collection: 'doctors', data: { ...data, _status: 'published' } })).rejects.toThrow(/department/i)
+    const draft = await payload.create({ collection: 'doctors', draft: true, data })
+    await expect(payload.update({ collection: 'doctors', id: draft.id, data: { _status: 'published' } })).rejects.toThrow(/department/i)
+    await payload.update({ collection: 'departments', id: draftDept, data: { _status: 'published' } })
+    const ok = await payload.update({ collection: 'doctors', id: draft.id, data: { _status: 'published' } })
+    expect(ok._status).toBe('published')
   })
 })
 

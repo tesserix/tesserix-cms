@@ -92,11 +92,11 @@ describe('content isolation', () => {
     expect(((await (await rest('/doctors')).json()) as { docs: unknown[] }).docs).toEqual([])
   })
 
-  test('REST: B media files are not served to an editor of A or to anonymous', async () => {
+  test('REST: B media files are not served to an editor of A (anonymous may, as published pages show photos)', async () => {
     const { filename } = await payload.findByID({ collection: 'media', id: mediaB })
     expect((await rest(`/media/file/${filename}`, editorB)).status).toBe(200)
     expect((await rest(`/media/file/${filename}`, editorA)).status).not.toBe(200)
-    expect((await rest(`/media/file/${filename}`)).status).not.toBe(200)
+    expect((await rest(`/media/file/${filename}`)).status).toBe(200)
   })
 })
 

@@ -1,6 +1,12 @@
 import { Forbidden, ValidationError, type Field, type FieldHook } from 'payload'
-import { slugify } from 'payload/shared'
 import { canApprove } from '../access/roles'
+
+/** Lowercase `a-z0-9-` only, dashes collapsed and trimmed. Typed and generated slugs both go through it. */
+export const slugify = (v: unknown) =>
+  String(v ?? '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
 
 const idOf = (v: unknown) => (typeof v === 'object' && v ? (v as { id: unknown }).id : v)
 
@@ -13,7 +19,7 @@ const checkSlug =
   async ({ value, data, originalDoc, operation, collection, req }) => {
     // Not `required` (so the generated types let callers omit it): an empty slug keeps the current
     // one, or is generated. It can never be cleared, which would also dodge the lock below.
-    const slug = value || originalDoc?.slug || slugify(data?.[useAsSlug] ?? originalDoc?.[useAsSlug])
+    const slug = slugify(value) || originalDoc?.slug || slugify(data?.[useAsSlug] ?? originalDoc?.[useAsSlug])
     if (!slug) return value
 
     // Live URLs may already be linked, so once a doc has ever been published only approvers may move it.

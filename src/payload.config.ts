@@ -2,7 +2,9 @@ import { postgresAdapter } from '@payloadcms/db-postgres'
 import { resendAdapter } from '@payloadcms/email-resend'
 import { multiTenantPlugin } from '@payloadcms/plugin-multi-tenant'
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
+import { gcsStorage } from '@payloadcms/storage-gcs'
 import { buildConfig, type Field } from 'payload'
+import sharp from 'sharp'
 import { isApprover, isSuperAdmin } from './access/roles'
 import { Departments } from './collections/hospital/Departments'
 import { Doctors } from './collections/hospital/Doctors'
@@ -66,6 +68,7 @@ export default buildConfig({
     Schemes,
   ],
   editor: lexicalEditor(),
+  sharp, // image sizes (card, profile) for media
   // Without a key (tests, local, build) Payload logs emails to the console instead.
   email: process.env.RESEND_API_KEY
     ? resendAdapter({
@@ -87,6 +90,15 @@ export default buildConfig({
     push: true, // shortcut: schema push until migrations land in Task 7
   }),
   plugins: [
+    // Only with a bucket: tests and local dev keep files on disk. No credentials here: the Google
+    // client uses Application Default Credentials (Workload Identity in the cluster).
+    gcsStorage({
+      enabled: Boolean(process.env.GCS_BUCKET),
+      bucket: process.env.GCS_BUCKET ?? '',
+      options: {},
+      // Serve from the bucket's public URL; bucket-level public read (uniform access) makes that work.
+      collections: { media: { disablePayloadAccessControl: true } },
+    }),
     multiTenantPlugin({
       // Every content collection must be listed here, or it is not tenant-scoped.
       collections: {

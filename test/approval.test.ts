@@ -169,6 +169,14 @@ describe('drafts and the publish gate', () => {
     expect(await publicNames()).toEqual(['Dr Draft', 'Dr Live v2'])
   })
 
+  test("an editor's REST restore (draft=true) of a version with a different slug is refused once published", async () => {
+    await payload.update({ collection: 'doctors', id: publishedId, data: { slug: 'renamed' }, ...as(approverA) })
+    const versions = await payload.findVersions({ collection: 'doctors', where: { parent: { equals: publishedId } }, ...as(editorA) })
+    const old = versions.docs.find((v) => v.version.slug === 'dr-live')!
+    expect((await rest(`/doctors/versions/${old.id}?draft=true`, editorA, { method: 'POST' })).status).toBe(403)
+    expect((await payload.findByID({ collection: 'doctors', id: publishedId })).slug).toBe('renamed')
+  })
+
   test('an approver can unpublish', async () => {
     await payload.update({ collection: 'doctors', id: publishedId, data: { _status: 'draft' }, ...as(approverA) })
     expect(await publicNames()).toEqual([])
@@ -291,10 +299,12 @@ describe('notifyApprovers', () => {
 
   test('a failing email never fails the save, and does not use up the hour', async () => {
     vi.mocked(payload.sendEmail).mockRejectedValueOnce(new Error('resend down'))
+    const logged = vi.spyOn(payload.logger, 'error').mockImplementation(() => undefined as never)
     const doc = await payload.update({ collection: 'doctors', id: draftId, draft: true, data: { name: 'v2' }, ...as(editorA) })
     expect(doc.name).toBe('v2')
     await sentCount(1)
     await vi.waitFor(async () => expect(await payload.kv.get(`approval-notified:doctors:${draftId}`)).toBeNull())
+    expect(logged).toHaveBeenCalledOnce()
     await payload.update({ collection: 'doctors', id: draftId, draft: true, data: { name: 'v3' }, ...as(editorA) })
     await sentCount(2)
   })
