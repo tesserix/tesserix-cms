@@ -79,6 +79,11 @@ export interface Config {
     insurers: Insurer;
     tpas: Tpa;
     schemes: Scheme;
+    products: Product;
+    'team-members': TeamMember;
+    principles: Principle;
+    beliefs: Belief;
+    'open-source-projects': OpenSourceProject;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
@@ -98,6 +103,11 @@ export interface Config {
     insurers: InsurersSelect<false> | InsurersSelect<true>;
     tpas: TpasSelect<false> | TpasSelect<true>;
     schemes: SchemesSelect<false> | SchemesSelect<true>;
+    products: ProductsSelect<false> | ProductsSelect<true>;
+    'team-members': TeamMembersSelect<false> | TeamMembersSelect<true>;
+    principles: PrinciplesSelect<false> | PrinciplesSelect<true>;
+    beliefs: BeliefsSelect<false> | BeliefsSelect<true>;
+    'open-source-projects': OpenSourceProjectsSelect<false> | OpenSourceProjectsSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
@@ -474,6 +484,290 @@ export interface Scheme {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "products".
+ */
+export interface Product {
+  id: number;
+  tenant?: (number | null) | Tenant;
+  title: string;
+  /**
+   * Used in the page URL. Generated from the title if left empty.
+   */
+  slug?: string | null;
+  hasBeenPublished?: boolean | null;
+  previousSlugs?: string[] | null;
+  tagline: string;
+  /**
+   * One or two sentences; also the page description for search engines.
+   */
+  description: string;
+  longDescription?: string | null;
+  icon:
+    | 'BarChart'
+    | 'Building2'
+    | 'CalendarDays'
+    | 'Camera'
+    | 'ChefHat'
+    | 'CreditCard'
+    | 'FileText'
+    | 'FlaskConical'
+    | 'History'
+    | 'Hospital'
+    | 'KeyRound'
+    | 'Languages'
+    | 'MapPin'
+    | 'MessageSquare'
+    | 'Mic'
+    | 'Package'
+    | 'Palette'
+    | 'Pencil'
+    | 'Pill'
+    | 'Plane'
+    | 'Salad'
+    | 'ScanLine'
+    | 'Shield'
+    | 'ShieldCheck'
+    | 'ShoppingBag'
+    | 'Truck'
+    | 'UserCheck'
+    | 'Users'
+    | 'Utensils'
+    | 'Wallet'
+    | 'Wrench';
+  /**
+   * Flipping to Available launches the product on the site and emails its waitlist.
+   */
+  status: 'available' | 'coming-soon';
+  industry: 'commerce' | 'food' | 'rentals' | 'healthcare' | 'nutrition' | 'travel';
+  /**
+   * Honest launch target for a coming-soon product, e.g. "Early 2027". Leave empty rather than guess.
+   */
+  eta?: string | null;
+  /**
+   * Short bullets for the /products rows and homepage cards.
+   */
+  highlights?: string[] | null;
+  features?:
+    | {
+        icon:
+          | 'BarChart'
+          | 'Building2'
+          | 'CalendarDays'
+          | 'Camera'
+          | 'ChefHat'
+          | 'CreditCard'
+          | 'FileText'
+          | 'FlaskConical'
+          | 'History'
+          | 'Hospital'
+          | 'KeyRound'
+          | 'Languages'
+          | 'MapPin'
+          | 'MessageSquare'
+          | 'Mic'
+          | 'Package'
+          | 'Palette'
+          | 'Pencil'
+          | 'Pill'
+          | 'Plane'
+          | 'Salad'
+          | 'ScanLine'
+          | 'Shield'
+          | 'ShieldCheck'
+          | 'ShoppingBag'
+          | 'Truck'
+          | 'UserCheck'
+          | 'Users'
+          | 'Utensils'
+          | 'Wallet'
+          | 'Wrench';
+        title: string;
+        description: string;
+        id?: string | null;
+      }[]
+    | null;
+  benefits?: string[] | null;
+  /**
+   * The product's own site. Pricing lives there.
+   */
+  website?: string | null;
+  /**
+   * Public pricing page, if there is one.
+   */
+  pricingUrl?: string | null;
+  /**
+   * Primary button on the detail page, available products only. Must match where the website goes.
+   */
+  ctaLabel?: string | null;
+  ctaSubtext?: string | null;
+  /**
+   * The real trial offer, exactly as the product's site states it.
+   */
+  trialLine?: string | null;
+  /**
+   * For search engines; defaults to "Web". Set e.g. "iOS, Android" for mobile-only products.
+   */
+  operatingSystem?: string | null;
+  /**
+   * App store presence. Leave the URL empty for a store listing that is not live yet.
+   */
+  listings?:
+    | {
+        platform: 'ios' | 'android';
+        url?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  /**
+   * A second Android app for the other side of the marketplace (Fe3dr home cooks).
+   */
+  vendorListingUrl?: string | null;
+  /**
+   * Landscape capture of the live site. Shown for available products only.
+   */
+  siteImage?: (number | null) | Media;
+  /**
+   * Portrait phone screenshots, two or three.
+   */
+  screenshots?: (number | Media)[] | null;
+  /**
+   * Lower comes first on the site.
+   */
+  order: number;
+  /**
+   * Written by approvers. Editors can read it but not change it.
+   */
+  reviewNote?: string | null;
+  /**
+   * Who saved this version.
+   */
+  updatedBy?: (number | null) | User;
+  updatedAt: string;
+  createdAt: string;
+  _status?: ('draft' | 'published') | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "team-members".
+ */
+export interface TeamMember {
+  id: number;
+  tenant?: (number | null) | Tenant;
+  name: string;
+  /**
+   * Used in the page URL. Generated from the name if left empty.
+   */
+  slug?: string | null;
+  hasBeenPublished?: boolean | null;
+  previousSlugs?: string[] | null;
+  title: string;
+  /**
+   * Only what the person's public profiles actually say.
+   */
+  bio?: string | null;
+  linkedIn: string;
+  github: string;
+  photo?: (number | null) | Media;
+  /**
+   * Lower comes first on the site.
+   */
+  order: number;
+  /**
+   * Written by approvers. Editors can read it but not change it.
+   */
+  reviewNote?: string | null;
+  /**
+   * Who saved this version.
+   */
+  updatedBy?: (number | null) | User;
+  updatedAt: string;
+  createdAt: string;
+  _status?: ('draft' | 'published') | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "principles".
+ */
+export interface Principle {
+  id: number;
+  tenant?: (number | null) | Tenant;
+  title: string;
+  body: string;
+  /**
+   * Lower comes first on the site.
+   */
+  order: number;
+  /**
+   * Written by approvers. Editors can read it but not change it.
+   */
+  reviewNote?: string | null;
+  /**
+   * Who saved this version.
+   */
+  updatedBy?: (number | null) | User;
+  updatedAt: string;
+  createdAt: string;
+  _status?: ('draft' | 'published') | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "beliefs".
+ */
+export interface Belief {
+  id: number;
+  tenant?: (number | null) | Tenant;
+  /**
+   * Short eyebrow above the title, e.g. "Humans reply".
+   */
+  label: string;
+  title: string;
+  body: string;
+  /**
+   * Lower comes first on the site.
+   */
+  order: number;
+  /**
+   * Written by approvers. Editors can read it but not change it.
+   */
+  reviewNote?: string | null;
+  /**
+   * Who saved this version.
+   */
+  updatedBy?: (number | null) | User;
+  updatedAt: string;
+  createdAt: string;
+  _status?: ('draft' | 'published') | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "open-source-projects".
+ */
+export interface OpenSourceProject {
+  id: number;
+  tenant?: (number | null) | Tenant;
+  /**
+   * The repository name under github.com/tesserix.
+   */
+  name: string;
+  description: string;
+  /**
+   * Lower comes first on the site.
+   */
+  order: number;
+  /**
+   * Written by approvers. Editors can read it but not change it.
+   */
+  reviewNote?: string | null;
+  /**
+   * Who saved this version.
+   */
+  updatedBy?: (number | null) | User;
+  updatedAt: string;
+  createdAt: string;
+  _status?: ('draft' | 'published') | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv".
  */
 export interface PayloadKv {
@@ -543,6 +837,26 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'schemes';
         value: number | Scheme;
+      } | null)
+    | ({
+        relationTo: 'products';
+        value: number | Product;
+      } | null)
+    | ({
+        relationTo: 'team-members';
+        value: number | TeamMember;
+      } | null)
+    | ({
+        relationTo: 'principles';
+        value: number | Principle;
+      } | null)
+    | ({
+        relationTo: 'beliefs';
+        value: number | Belief;
+      } | null)
+    | ({
+        relationTo: 'open-source-projects';
+        value: number | OpenSourceProject;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -830,6 +1144,124 @@ export interface SchemesSelect<T extends boolean = true> {
   tenant?: T;
   name?: T;
   description?: T;
+  reviewNote?: T;
+  updatedBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  _status?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "products_select".
+ */
+export interface ProductsSelect<T extends boolean = true> {
+  tenant?: T;
+  title?: T;
+  slug?: T;
+  hasBeenPublished?: T;
+  previousSlugs?: T;
+  tagline?: T;
+  description?: T;
+  longDescription?: T;
+  icon?: T;
+  status?: T;
+  industry?: T;
+  eta?: T;
+  highlights?: T;
+  features?:
+    | T
+    | {
+        icon?: T;
+        title?: T;
+        description?: T;
+        id?: T;
+      };
+  benefits?: T;
+  website?: T;
+  pricingUrl?: T;
+  ctaLabel?: T;
+  ctaSubtext?: T;
+  trialLine?: T;
+  operatingSystem?: T;
+  listings?:
+    | T
+    | {
+        platform?: T;
+        url?: T;
+        id?: T;
+      };
+  vendorListingUrl?: T;
+  siteImage?: T;
+  screenshots?: T;
+  order?: T;
+  reviewNote?: T;
+  updatedBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  _status?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "team-members_select".
+ */
+export interface TeamMembersSelect<T extends boolean = true> {
+  tenant?: T;
+  name?: T;
+  slug?: T;
+  hasBeenPublished?: T;
+  previousSlugs?: T;
+  title?: T;
+  bio?: T;
+  linkedIn?: T;
+  github?: T;
+  photo?: T;
+  order?: T;
+  reviewNote?: T;
+  updatedBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  _status?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "principles_select".
+ */
+export interface PrinciplesSelect<T extends boolean = true> {
+  tenant?: T;
+  title?: T;
+  body?: T;
+  order?: T;
+  reviewNote?: T;
+  updatedBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  _status?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "beliefs_select".
+ */
+export interface BeliefsSelect<T extends boolean = true> {
+  tenant?: T;
+  label?: T;
+  title?: T;
+  body?: T;
+  order?: T;
+  reviewNote?: T;
+  updatedBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  _status?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "open-source-projects_select".
+ */
+export interface OpenSourceProjectsSelect<T extends boolean = true> {
+  tenant?: T;
+  name?: T;
+  description?: T;
+  order?: T;
   reviewNote?: T;
   updatedBy?: T;
   updatedAt?: T;
