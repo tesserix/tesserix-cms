@@ -67,3 +67,35 @@ New users set their password with "Forgot password?".
 
 If something looks wrong on the website after publishing, wait a minute and reload. If it
 still looks wrong, or you are locked out, email the Tesserix team.
+
+## The Tesserix website (tesserix.app)
+
+The same CMS holds the content of the Tesserix company site, under the **Tesserix** group in
+the left menu (visible only to Tesserix users). The roles and the draft → publish flow above
+apply unchanged. Once published, a change is on tesserix.app within a minute.
+
+| Section | What it is on the site |
+|---|---|
+| **Products** | Every product page under /products, the homepage product stack, the navbar menu, the footer links and the contact form's product list. |
+| **Team members** | "Who we are" on /about. |
+| **Principles** | "How we work" on /about and "What we look for" on /careers; numbered by position. |
+| **Beliefs** | The three "what we believe" cards on the homepage. |
+| **Open-source projects** | The open-source strip on the homepage; the link is github.com/tesserix/<name>. |
+
+Things to know:
+
+- **Order** (right-hand side) decides position everywhere: lower comes first. The order of
+  Products is also the order in which the industries are listed in the hero and footer.
+- **Status** on a product is the launch switch. Flipping it to **Available** and publishing
+  puts the product live on the site, and the site then emails everyone on that product's
+  waitlist. Only do this when the product is really available.
+- **ETA** on a coming-soon product is shown on the homepage. Leave it empty rather than guess.
+- **Site image** and **Screenshots** are shown for available products only. Upload the real
+  thing: a landscape capture of the live site, and two or three portrait phone screenshots.
+- **Listings**: add an App Store or Google Play row with the store URL. Leave the URL empty for
+  a listing that exists but is not live yet (for example an iOS app under review); the site
+  shows a "coming soon" badge instead of a dead link.
+- **Icons** are picked from a fixed list; the site renders a generic box for anything it does
+  not recognise, so a newer icon needs a site release first.
+- If the CMS is ever unreachable, the site keeps serving the content it was built with; it
+  does not go blank.
