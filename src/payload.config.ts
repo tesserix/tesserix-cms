@@ -16,6 +16,11 @@ import { Testimonials } from './collections/hospital/Testimonials'
 import { Tpas } from './collections/hospital/Tpas'
 import { Videos } from './collections/hospital/Videos'
 import { Media } from './collections/Media'
+import { Beliefs } from './collections/tesserix/Beliefs'
+import { OpenSourceProjects } from './collections/tesserix/OpenSourceProjects'
+import { Principles } from './collections/tesserix/Principles'
+import { Products } from './collections/tesserix/Products'
+import { TeamMembers } from './collections/tesserix/TeamMembers'
 import { Tenants } from './collections/Tenants'
 import { Users } from './collections/Users'
 
@@ -66,6 +71,12 @@ export default buildConfig({
     Insurers,
     Tpas,
     Schemes,
+    // tesserix.app marketing site
+    Products,
+    TeamMembers,
+    Principles,
+    Beliefs,
+    OpenSourceProjects,
   ],
   editor: lexicalEditor(),
   sharp, // image sizes (card, profile) for media
@@ -113,6 +124,11 @@ export default buildConfig({
         insurers: {},
         tpas: {},
         schemes: {},
+        products: {},
+        'team-members': {},
+        principles: {},
+        beliefs: {},
+        'open-source-projects': {},
       },
       userHasAccessToAllTenants: isSuperAdmin,
       tenantsArrayField: {
